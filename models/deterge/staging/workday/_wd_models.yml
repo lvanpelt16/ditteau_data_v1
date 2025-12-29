@@ -1,0 +1,450 @@
+version: 2
+
+models:
+  - name: stg_wd__students
+    description: |
+      Staging model for student data from Workday Student (NEW system of record).
+      
+      This model provides cleaned and standardized student information including
+      demographics, contact details, academic programs, and status flags. Workday
+      is the primary source system replacing legacy Jenzabar CX.
+      
+      **Grain**: One row per student
+      **Source**: workday.sta_student_wd
+      **Materialization**: View
+      **Updates**: Refreshed with each dbt run (currently manual CSV loads)
+      **Owner**: Registrar / Data Engineering
+      
+      **Key Features:**
+      - Uses preferred names when available (falls back to legal names)
+      - Combines duplicate middle name fields from Workday
+      - Converts numeric flags (0/1) to booleans (true/false)
+      - Standardizes nulls (empty strings → NULL)
+      - Includes MATCHING_HISTORICAL_STUDENT for linking to Jenzabar CX
+      
+      **Integration Notes:**
+      - This is the PRIMARY source for current students
+      - Jenzabar CX data used as fallback for legacy students
+      - MATCHING_HISTORICAL_STUDENT field enables cross-system matching
+    
+    columns:
+      # =====================================================================
+      # PRIMARY KEY
+      # =====================================================================
+      - name: student_id
+        description: |
+          Primary student identifier from Workday Student (REFERENCEID_62792180).
+          This is the system-generated unique ID for each student in Workday.
+          
+          Used as the natural key for entity resolution in dim_integration_ids.
+        tests:
+          - not_null
+          - unique
+      
+      # =====================================================================
+      # NAME FIELDS
+      # =====================================================================
+      - name: first_name
+        description: |
+          Student's first name - uses preferred first name if available,
+          falls back to legal first name (FIRSTNAME).
+          
+          This field prioritizes how the student wants to be addressed.
+        tests:
+          - not_null
+      
+      - name: last_name
+        description: Student's legal last name
+        tests:
+          - not_null
+      
+      - name: middle_name
+        description: |
+          Student's middle name - combines two middle name fields from Workday
+          (MIDDLE_NAME_9181921 and MIDDLE_NAME_349405).
+      
+      - name: full_legal_name
+        description: Complete legal name as a single string (from FULL_LEGAL_NAME)
+      
+      - name: full_name_fml
+        description: Full name formatted as First Middle Last
+      
+      - name: full_name_lfmi
+        description: Full name formatted as Last, First Middle Initial
+      
+      - name: legal_name
+        description: Student's complete legal name
+      
+      - name: preferred_name
+        description: Student's preferred full name (if different from legal)
+      
+      - name: name_prefix
+        description: Name prefix (Dr., Mr., Ms., etc.)
+      
+      # =====================================================================
+      # CONTACT INFORMATION
+      # =====================================================================
+      - name: email
+        description: |
+          Primary institutional email address (PRIMARY_INSTITUTIONAL_EMAIL_ADDRESS).
+          Standardized to lowercase for matching purposes.
+          
+          **CRITICAL FIELD** for cross-system entity resolution (matching to
+          Jenzabar CX, PowerFAIDS, Slate via email).
+        tests:
+          - not_null
+      
+      # =====================================================================
+      # ADDRESS
+      # =====================================================================
+      - name: city
+        description: City from primary home address
+      
+      - name: state
+        description: State/province from primary home address
+      
+      - name: postal_code
+        description: Postal/ZIP code from primary home address
+      
+      - name: county
+        description: County from primary home address
+      
+      - name: country
+        description: Country from primary home address
+      
+      # =====================================================================
+      # DEMOGRAPHICS
+      # =====================================================================
+      - name: birth_date
+        description: Student's date of birth (DATE_OF_BIRTH)
+        tests:
+          - not_null
+      
+      - name: age
+        description: |
+          Student's current age as calculated by Workday.
+          Updated automatically by Workday system.
+      
+      - name: age_group
+        description: Age range grouping from Workday
+      
+      - name: gender
+        description: Student's gender
+      
+      - name: gender_identity
+        description: |
+          Student's gender identity (if different from assigned gender).
+          Used for inclusive reporting and student services.
+      
+      - name: sexual_orientation
+        description: Student's sexual orientation (if provided)
+      
+      - name: pronoun
+        description: Student's preferred pronouns (he/him, she/her, they/them, etc.)
+      
+      - name: race_ethnicities
+        description: |
+          Student's race and ethnicity designations.
+          May contain multiple values from Workday's race/ethnicity taxonomy.
+      
+      - name: race_ethnicity_dw
+        description: |
+          Rewritten race/ethnicity for data warehouse reporting.
+          Standardized format for IPEDS and other reporting requirements.
+      
+      - name: is_hispanic_or_latino
+        description: |
+          Boolean flag indicating Hispanic or Latino ethnicity.
+          Derived from HISPANIC_OR_LATINO field (1=true, 0=false).
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: citizenship_status
+        description: Student's citizenship status
+      
+      - name: citizenship_countries
+        description: Countries of citizenship (may be multiple)
+      
+      - name: primary_nationality
+        description: Student's primary nationality
+      
+      - name: nationality_citizenship_status
+        description: Combined nationality and citizenship status
+      
+      - name: countries_of_residence
+        description: Countries where student has resided
+      
+      - name: region_of_birth
+        description: Geographic region where student was born
+      
+      - name: marital_status
+        description: Student's marital status
+      
+      - name: religion
+        description: Student's religious affiliation (if provided)
+      
+      - name: languages
+        description: Languages spoken by student
+      
+      # =====================================================================
+      # ACADEMIC INFORMATION
+      # =====================================================================
+      - name: academic_unit
+        description: |
+          Student's primary academic unit (college, school, division).
+          Used for departmental reporting and advising.
+      
+      - name: primary_academic_level
+        description: |
+          Student's academic level (Freshman, Sophomore, Junior, Senior, Graduate).
+          Used for class standing reports.
+      
+      - name: primary_program_of_study
+        description: |
+          Student's primary program/major.
+          This is the PRIMARY academic program field for reporting.
+      
+      - name: academic_records
+        description: References to student's academic records in Workday
+      
+      - name: academic_record_status
+        description: Status of the academic record
+      
+      - name: active_academic_records
+        description: List of currently active academic records
+      
+      - name: active_reporting_records
+        description: Academic records that should be included in reporting
+      
+      - name: class_rank
+        description: Student's class rank (if calculated)
+      
+      - name: class_size
+        description: Total size of student's graduating class
+      
+      # =====================================================================
+      # STUDENT STATUS FLAGS
+      # =====================================================================
+      - name: is_active_matriculated
+        description: |
+          Boolean flag indicating if student is currently matriculated (enrolled).
+          TRUE = student is actively matriculated
+          FALSE = not currently matriculated (withdrawn, graduated, etc.)
+          
+          **KEY FIELD** for identifying current students.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_matriculated
+        description: |
+          Boolean flag indicating if student has ever matriculated.
+          Different from is_active_matriculated - this shows historical matriculation.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_active_worker
+        description: |
+          Boolean flag indicating if student is also an active employee.
+          Used to identify student-workers.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_graduated
+        description: Boolean flag indicating if student has graduated
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_deceased
+        description: Boolean flag indicating if student is deceased
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_first_generation
+        description: |
+          Boolean flag indicating first-generation college student status.
+          Important for student services, retention programs, and reporting.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_national_identifier
+        description: |
+          Boolean flag indicating if student has a national identifier (SSN, SIN, etc.).
+          Used for financial aid and tax reporting eligibility.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_privacy_block
+        description: |
+          Boolean flag indicating FERPA privacy block.
+          TRUE = student has requested directory information not be released.
+          
+          **CRITICAL** for FERPA compliance - must be checked before releasing data.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      # =====================================================================
+      # MILITARY
+      # =====================================================================
+      - name: has_military_relationship
+        description: |
+          Boolean flag indicating student has a military relationship
+          (veteran, active duty, dependent, etc.).
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: parent_on_active_duty
+        description: |
+          Boolean flag indicating student's parent is on active military duty.
+          Used for dependent benefits.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: military_service
+        description: Type of military service (if applicable)
+      
+      - name: military_status_for_benefits
+        description: Military status for educational benefits eligibility
+      
+      # =====================================================================
+      # HISTORICAL/MERGE TRACKING
+      # =====================================================================
+      - name: matching_historical_student
+        description: |
+          **CRITICAL FIELD FOR ENTITY RESOLUTION**
+          
+          Reference to historical/legacy student record from Jenzabar CX.
+          Workday uses this field to link new Workday Student records back to
+          their corresponding Jenzabar CX student IDs.
+          
+          This enables high-confidence matching between systems in dim_integration_ids.
+          
+          **Example:** If this field contains "JCX-789012", then this Workday
+          student corresponds to student ID 789012 in Jenzabar CX.
+      
+      - name: activated_historical_student
+        description: Reference to historical student that was activated
+      
+      - name: historical_activation_datetime
+        description: Date/time when historical student record was activated in Workday
+      
+      - name: match_status
+        description: Status of match to historical student record
+      
+      - name: is_unmerged
+        description: |
+          Boolean flag indicating if this is an unmerged duplicate record.
+          TRUE = this record is a duplicate that should be merged.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: primary_merged_student
+        description: |
+          Reference to the primary student record if this is a merged duplicate.
+          If populated, this record is secondary to another student record.
+      
+      - name: former_worker
+        description: Reference to former worker record (if student was previously employee)
+      
+      # =====================================================================
+      # OTHER RECORDS/ACTIVITIES
+      # =====================================================================
+      - name: active_student_applications
+        description: List of active applications (if student has pending applications)
+      
+      - name: awards_and_activities
+        description: Student awards, honors, and extracurricular activities
+      
+      - name: extracurricular_activities
+        description: Extracurricular activities and organizations
+      
+      - name: current_housing_status
+        description: Current on-campus housing status
+      
+      - name: all_appointments
+        description: Student appointments (advising, tutoring, etc.)
+      
+      # =====================================================================
+      # FINANCIAL AID
+      # =====================================================================
+      - name: financial_aid_award_years
+        description: |
+          Academic years for which student has financial aid awards.
+          Used to determine financial aid eligibility and history.
+      
+      - name: financial_aid_record
+        description: Reference to student's financial aid record in Workday
+      
+      # =====================================================================
+      # IDENTIFIERS
+      # =====================================================================
+      - name: reference_id_alt
+        description: |
+          Alternate reference ID from Workday (REFERENCEID_54572908).
+          Purpose varies by institution - may be external system ID.
+      
+      - name: other_ids
+        description: |
+          Other identification numbers from external systems.
+          May include previous institution IDs, state IDs, etc.
+      
+      - name: additional_names
+        description: Additional names, aliases, or name variations
+      
+      # =====================================================================
+      # ADMINISTRATIVE
+      # =====================================================================
+      - name: institution
+        description: Institution identifier (if multi-institution Workday instance)
+      
+      - name: created_on_date
+        description: |
+          Date when student record was created in Workday.
+          Used as effective_date in dim_integration_ids if available.
+      
+      - name: date_of_death
+        description: Date of death (if applicable and is_deceased = true)
+      
+      - name: official_transcript_note
+        description: Note that appears on official transcripts
+      
+      # =====================================================================
+      # METADATA COLUMNS (from add_source_metadata macro)
+      # =====================================================================
+      - name: _source_system
+        description: Source system identifier (WORKDAY)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WORKDAY']
+      
+      - name: _source_table
+        description: Source table name (STA_STUDENT_WD)
+        tests:
+          - not_null
+      
+      - name: _data_classification
+        description: Data classification level (CONFIDENTIAL - contains extensive PII)
+        tests:
+          - not_null
+      
+      - name: _data_owner
+        description: Data owner department (REGISTRAR)
+        tests:
+          - not_null
+      
+      - name: _dbt_loaded_at
+        description: Timestamp when dbt processed this record
+        tests:
+          - not_null

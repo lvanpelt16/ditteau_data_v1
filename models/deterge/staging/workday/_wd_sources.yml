@@ -1,0 +1,169 @@
+version: 2
+
+sources:
+  - name: workday
+    database: DITTEAU_DATA
+    schema: DEPOSIT
+    description: |
+      Workday Student source data - NEW system of record replacing Jenzabar CX.
+      
+      This is the primary Student Information System (SIS) going forward.
+      Data integration with legacy Jenzabar CX system is required during migration.
+      
+      **Load Method:** CSV files provided by institution, loaded to Deposit layer
+    
+    # Source-level metadata (applies to all tables unless overridden)
+    meta:
+      source_system: WORKDAY
+      ingest_type: CSV_LOAD
+      data_owner: REGISTRAR
+      is_external_share: false  # CSV upload, not data share
+    
+    tables:
+      - name: sta_student_wd
+        description: |
+          Student master data from Workday Student including demographics,
+          contact information, academic records, and enrollment status.
+          
+          **Grain**: One row per student
+          **Source**: Workday Student SIS
+          **Load Method**: CSV upload to Deposit
+          **Load Frequency**: As needed (will move to automated sync)
+          **Primary Key**: REFERENCEID_62792180
+          
+          **Key Matching Fields for Entity Resolution:**
+          - REFERENCEID_62792180 (Workday Student ID)
+          - PRIMARY_INSTITUTIONAL_EMAIL_ADDRESS (email)
+          - FIRSTNAME + LASTNAME + DATE_OF_BIRTH (fuzzy matching)
+          - MATCHING_HISTORICAL_STUDENT (links to Jenzabar records)
+        
+        meta:
+          data_class: CONFIDENTIAL  # Contains extensive PII
+          contains_pii: true
+        
+        freshness:
+          warn_after: {count: 7, period: day}   # Manual loads, less frequent
+          error_after: {count: 30, period: day}
+        
+        columns:
+          # Primary Key
+          - name: referenceid_62792180
+            description: |
+              Primary student identifier in Workday Student.
+              This is the system-generated unique ID for each student.
+            tests:
+              - not_null
+              - unique
+          
+          # Name Fields
+          - name: firstname
+            description: Student's legal first name
+          
+          - name: preferred_first_name
+            description: Student's preferred first name (if different from legal)
+          
+          - name: lastname
+            description: Student's legal last name
+            tests:
+              - not_null
+          
+          - name: middle_name_9181921
+            description: Student's middle name (primary field)
+          
+          - name: middle_name_349405
+            description: Student's middle name (alternate field)
+          
+          - name: full_legal_name
+            description: Complete legal name as one string
+          
+          - name: preferred_name
+            description: Student's preferred full name
+          
+          # Contact
+          - name: primary_institutional_email_address
+            description: |
+              Student's primary institutional email address.
+              CRITICAL for matching students across Jenzabar CX, PowerFAIDS, Slate.
+          
+          # Demographics
+          - name: date_of_birth
+            description: Student's date of birth (YYYY-MM-DD)
+          
+          - name: age
+            description: Student's current age (calculated by Workday)
+          
+          - name: gender
+            description: Student's gender
+          
+          - name: gender_identity
+            description: Student's gender identity
+          
+          - name: sexual_orientation
+            description: Student's sexual orientation
+          
+          - name: pronoun
+            description: Student's preferred pronouns
+          
+          - name: race_ethnicities
+            description: Student's race and ethnicity designations
+          
+          - name: hispanic_or_latino
+            description: Flag indicating Hispanic or Latino ethnicity (1=yes, 0=no)
+          
+          # Academic
+          - name: academic_unit
+            description: Student's primary academic unit/college
+          
+          - name: primary_academic_level
+            description: Student's academic level (Freshman, Sophomore, etc.)
+          
+          - name: primary_program_of_study
+            description: Student's primary major/program
+          
+          - name: active_matriculated_student
+            description: Flag indicating if student is currently matriculated (1=yes, 0=no)
+          
+          - name: matriculated_student
+            description: Flag indicating if student has ever matriculated (1=yes, 0=no)
+          
+          - name: graduated
+            description: Flag indicating if student has graduated (1=yes, 0=no)
+          
+          # Matching/Integration
+          - name: matching_historical_student
+            description: |
+              Reference to historical/legacy student record (likely Jenzabar CX ID).
+              CRITICAL for linking Workday Student records to Jenzabar CX records.
+          
+          - name: match_status
+            description: Status of match to historical student record
+          
+          - name: is_unmerged
+            description: Flag indicating if record is unmerged (1=yes, 0=no)
+          
+          - name: primary_merged_student
+            description: Reference to primary student if this is a merged duplicate
+          
+          # Status Flags
+          - name: first_generation_college_student
+            description: Flag indicating first generation college student (1=yes, 0=no)
+          
+          - name: privacy_block
+            description: Flag indicating FERPA privacy block (1=yes, 0=no)
+          
+          - name: deceased
+            description: Flag indicating if student is deceased (1=yes, 0=no)
+          
+          # Dates
+          - name: created_on_date
+            description: Date when student record was created in Workday
+          
+          - name: date_of_death
+            description: Student's date of death (if applicable)
+          
+          # Administrative
+          - name: institution
+            description: Institution identifier
+          
+          - name: referenceid_54572908
+            description: Alternate reference ID (purpose TBD)

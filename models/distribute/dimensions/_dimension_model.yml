@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  
+  - name: dim_date
+    description: "Date dimension with academic, fiscal, and term associations"
+    columns:
+      - name: date_key
+        description: "YYYYMMDD surrogate key"
+        tests:
+          - unique
+          - not_null
+      - name: date_actual
+        description: "Actual calendar date"
+        tests:
+          - not_null

@@ -1,0 +1,136 @@
+name: ditteau_data_v1
+version: 1.0.0
+config-version: 2
+
+profile: ditteau_data_v1
+
+
+# File paths
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]  # Add this for SCD Type 2
+docs-paths: ["docs"]  # Add for custom documentation
+
+# Where compiled artifacts go
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Variables for flexibility
+vars:
+  # Current academic year - update this each fall
+  current_academic_year: '2024-2025'
+  current_term_code: 'FA24'
+  
+  # Source system prefixes
+  jenzabar_prefix: 'jcx'
+  powerfaids_prefix: 'pf'
+  
+  # Date thresholds
+  historical_cutoff_years: 10
+
+# Model configurations
+models:
+  ditteau_data_v1:
+    +database: DITTEAU_DATA
+    +materialized: view  # Safe default
+    +on_schema_change: "sync_all_columns"  # Auto-adjust to schema changes
+    
+    # DEPOSIT layer - Raw sources as views
+    deposit:
+      +schema: DEPOSIT
+      +materialized: view
+      +tags: ['bronze', 'raw']
+      +meta:
+        layer: 'bronze'
+        contains_pii: true
+        owner: 'data_engineering'
+    
+    # DETERGE layer - Cleaned and conformed
+    deterge:
+      +schema: "{{ 'DETERGE_DEV' if target.name == 'dev' else 'DETERGE' }}"
+      +materialized: table
+      +tags: ['silver', 'cleaned']
+      +meta:
+        layer: 'silver'
+        owner: 'data_engineering'
+      
+      # Core staging area
+      staging:
+        +materialized: view  # Staging should be lightweight
+        +tags: ['silver', 'staging']
+      
+      # Intermediate transformations
+      intermediate:
+        +materialized: ephemeral  # Don't persist, just for dependency
+        +tags: ['silver', 'intermediate']
+      
+      # Conformed dimensions and facts
+      core:
+        +materialized: table
+        +tags: ['silver', 'core', 'conformed']
+    
+    # DISTRIBUTE layer - Business-ready marts
+    distribute:
+      +schema: "{{ 'DISTRIBUTE_DEV' if target.name == 'dev' else 'DISTRIBUTE' }}"
+      +materialized: table
+      +tags: ['gold', 'analytics']
+      +meta:
+        layer: 'gold'
+        owner: 'data_engineering'
+      
+      # Dimensional models
+      dimensions:
+        +materialized: table
+        +tags: ['gold', 'dimension']
+      
+      # Fact tables
+      facts:
+        +materialized: table
+        +tags: ['gold', 'fact']
+        +meta:
+          grain_documented: true
+      
+      # Analytics-ready marts by domain
+      enrollment:
+        +materialized: table
+        +tags: ['gold', 'mart', 'enrollment']
+        +meta:
+          business_owner: 'enrollment_team'
+      
+      financial_aid:
+        +materialized: table
+        +tags: ['gold', 'mart', 'financial_aid']
+        +meta:
+          business_owner: 'financial_aid_office'
+      
+      academic:
+        +materialized: table
+        +tags: ['gold', 'mart', 'academic']
+        +meta:
+          business_owner: 'registrar'
+
+# Snapshot configurations (for SCD Type 2)
+snapshots:
+  ditteau_data_v1:
+    +target_database: DITTEAU_DATA
+    +target_schema: "{{ 'DETERGE_DEV' if target.name == 'dev' else 'DETERGE' }}"
+    +strategy: timestamp
+    +unique_key: id
+    +updated_at: updated_at
+
+# Seed configurations (for reference data)
+seeds:
+  ditteau_data_v1:
+    +database: DITTEAU_DATA
+    +schema: DEPOSIT
+    +tags: ['seed', 'reference']
+    # Example seed configs
+    academic_calendars:
+      +column_types:
+        term_start_date: date
+        term_end_date: date

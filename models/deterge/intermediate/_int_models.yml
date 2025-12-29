@@ -1,0 +1,422 @@
+version: 2
+
+models:
+  - name: dim_integration_ids
+    description: |
+      **Universal master ID resolution table for all entity types.**
+      
+      Creates and maintains Ditteau IDs - permanent, platform-level identifiers that
+      persist regardless of source system changes. Supports all entity types including
+      persons (with multiple roles), organizations, courses, and more.
+      
+      **Key Design: ONE PERSON = ONE DITTEAU_ID**
+      - A person who is a student, then faculty, then donor gets ONE DTU_PERSON_XXXXXX ID
+      - Multiple rows in this table with same ditteau_id but different role_type values
+      - Enables true 360° view of individuals across their lifetime relationship
+      
+      **Supported Entity Types:**
+      - PERSON: Students, Faculty, Staff, Alumni, Donors, Applicants, Parents
+      - ORGANIZATION: Vendors, Employers, Partner Institutions
+      - COURSE: Academic courses/classes
+      - PROGRAM: Academic programs/degrees
+      - BUILDING: Physical buildings/facilities
+      
+      **Grain**: One row per ditteau_id + entity_type + role_type + source_system + source_id
+      
+      **Example - Jane Doe across her lifetime:**
+      ```
+      ditteau_id       | entity_type | role_type | source_system | source_id
+      -----------------|-------------|-----------|---------------|----------
+      DTU_PERSON_00042 | PERSON      | STUDENT   | JENZABAR_CX   | STU123
+      DTU_PERSON_00042 | PERSON      | STUDENT   | POWERFAIDS    | PF456
+      DTU_PERSON_00042 | PERSON      | FACULTY   | JENZABAR_CX   | FAC789
+      DTU_PERSON_00042 | PERSON      | DONOR     | RAISER_EDGE   | DNR321
+      DTU_PERSON_00042 | PERSON      | ALUMNI    | ALUMNI_DB     | ALM555
+      ```
+      
+      **Usage - Get complete person profile:**
+      ```sql
+      select * from dim_integration_ids
+      where ditteau_id = 'DTU_PERSON_00042'
+      and is_current = true;
+      ```
+      
+      **Usage - Join student data with donor data for same person:**
+      ```sql
+      select
+          p.ditteau_id,
+          s.enrollment_status,
+          d.lifetime_giving
+      from dim_integration_ids p
+      left join dim_integration_ids student_ids
+          on p.ditteau_id = student_ids.ditteau_id
+          and student_ids.role_type = 'STUDENT'
+      left join student_data s on student_ids.source_id = s.student_id
+      left join dim_integration_ids donor_ids
+          on p.ditteau_id = donor_ids.ditteau_id
+          and donor_ids.role_type = 'DONOR'
+      left join donor_data d on donor_ids.source_id = d.donor_id
+      where p.is_current = true;
+      ```
+      
+      **Owner**: Data Engineering
+    
+    config:
+      tags: ['integration', 'id_resolution', 'core', 'universal']
+    
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - ditteau_id
+            - entity_type
+            - role_type
+            - source_system
+            - source_id
+            - effective_date
+          config:
+            severity: error
+    
+    columns:
+      # Entity Classification
+      - name: entity_type
+        description: |
+          Top-level classification of what kind of entity this is.
+          
+          **Valid Values:**
+          - PERSON: Individual humans (students, faculty, donors, etc.)
+          - ORGANIZATION: Companies, institutions, vendors, partners
+          - COURSE: Academic courses and classes
+          - PROGRAM: Academic programs and degrees
+          - BUILDING: Physical buildings and facilities
+          - ROOM: Physical rooms and spaces
+          - EQUIPMENT: Physical equipment and assets
+          
+          **Important**: For PERSON entities, role_type provides sub-classification
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: 
+                - 'PERSON'
+                - 'ORGANIZATION'
+                - 'COURSE'
+                - 'PROGRAM'
+                - 'BUILDING'
+                - 'ROOM'
+                - 'EQUIPMENT'
+              config:
+                severity: warn  # Warn allows new entity types to be added
+      
+      - name: ditteau_id
+        description: |
+          **The permanent Ditteau platform identifier - the master/golden record ID.**
+          
+          This ID is created by Ditteau Data and persists regardless of:
+          - Source system migrations (JCX → Colleague → Workday)
+          - Institutional mergers or reorganizations
+          - Role changes (student becomes faculty becomes donor)
+          
+          **Format by Entity Type:**
+          - PERSON: DTU_PERSON_000000001
+          - ORGANIZATION: DTU_ORG_000000001
+          - COURSE: DTU_COURSE_000000001
+          - PROGRAM: DTU_PROGRAM_000000001
+          - BUILDING: DTU_BUILDING_000000001
+          
+          **Key Principle**: One person gets ONE Ditteau ID for life, regardless of roles.
+          
+          **Example**: Jane Doe is DTU_PERSON_000042 whether she's a:
+          - Student (role_type='STUDENT')
+          - Faculty member (role_type='FACULTY')
+          - Donor (role_type='DONOR')
+          - All of the above simultaneously
+          
+          **ID Generation**: Sequential integers with zero-padding, assigned on first
+          appearance in ANY source system.
+        tests:
+          - not_null:
+              config:
+                severity: error
+      
+      - name: role_type
+        description: |
+          **For PERSON entities only**: The role/capacity in which this person interacts
+          with the institution. NULL for non-PERSON entities.
+          
+          **One person can have MULTIPLE role_types simultaneously or sequentially.**
+          
+          **Valid Values for PERSON entities:**
+          - STUDENT: Currently enrolled or historical students
+          - FACULTY: Teaching faculty (full-time, part-time, adjunct)
+          - STAFF: Administrative and support staff
+          - ALUMNI: Graduated students (can overlap with FACULTY, DONOR, etc.)
+          - DONOR: Financial contributors (can overlap with any other role)
+          - APPLICANT: Prospective students (from admissions system)
+          - PARENT: Student parents/guardians
+          - VENDOR_CONTACT: Contact person at a vendor organization
+          - TRUSTEE: Board members
+          - VOLUNTEER: Institutional volunteers
+          
+          **NULL for non-PERSON entities** (organizations, courses, buildings, etc.)
+          
+          **Important**: This is NOT mutually exclusive. Same ditteau_id can have
+          multiple role_type values (e.g., STUDENT and DONOR simultaneously).
+        tests:
+          - relationships:
+              to: ref('seed_valid_role_types')
+              field: role_type
+              where: "role_type is not null"
+              config:
+                severity: warn
+      
+      - name: institution_code
+        description: |
+          Institution identifier for multi-institution Ditteau Data platforms.
+          
+          **Current Implementation**: Single institution, hardcoded value
+          **Future**: Will support multiple institutions in same Ditteau instance
+          
+          **Format**: Short code (e.g., 'MIDWEST_U', 'COASTAL_COLLEGE')
+          
+          **Use Case**: Consortium arrangements, system-wide analytics, transfer students
+        tests:
+          - not_null:
+              config:
+                severity: error
+      
+      # Source System Mapping
+      - name: source_system
+        description: |
+          The source system where this identifier originates.
+          
+          **Person Sources:**
+          - JENZABAR_CX: Student Information System
+          - POWERFAIDS: Financial Aid system
+          - SLATE: Admissions/CRM system
+          - CANVAS: Learning Management System
+          - RAISER_EDGE: Advancement/Donor system
+          - ALUMNI_DATABASE: Alumni relations system
+          - HR_SYSTEM: Human Resources system
+          
+          **Organization Sources:**
+          - FINANCE_SYSTEM: Accounts payable/vendor management
+          - PROCUREMENT: Procurement system
+          
+          **Course Sources:**
+          - JENZABAR_CX: Course catalog
+          - CANVAS: LMS courses
+        tests:
+          - not_null:
+              config:
+                severity: error
+      
+      - name: source_id
+        description: |
+          The identifier used in the source system for this entity in this role.
+          
+          **Examples:**
+          - For JENZABAR_CX student: The student_id field value
+          - For JENZABAR_CX faculty: The faculty_id field value
+          - For POWERFAIDS: The student_id in PowerFAIDS
+          - For RAISER_EDGE: The donor_id/constituent_id
+          
+          **Key Point**: Same person with different roles will have DIFFERENT source_ids:
+          - Student role: source_id = 'STU123' (from JCX students table)
+          - Faculty role: source_id = 'FAC456' (from JCX faculty table)
+          - Both map to same ditteau_id!
+        tests:
+          - not_null:
+              config:
+                severity: error
+      
+      - name: is_primary_source
+        description: |
+          Indicates which source system is authoritative for this entity + role combination.
+          
+          **TRUE**: This source system is the system of record for this role
+          **FALSE**: This is a secondary/derived identifier
+          
+          **Examples:**
+          - For STUDENT role: JENZABAR_CX is primary (true), POWERFAIDS is secondary (false)
+          - For DONOR role: RAISER_EDGE is primary (true)
+          - For FACULTY role: HR_SYSTEM might be primary (true), JCX secondary (false)
+          
+          **Important**: Each role_type + source_system combination should have exactly
+          one primary source per ditteau_id.
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: [true, false]
+              config:
+                severity: error
+      
+      # Temporal Tracking (SCD Type 2)
+      - name: effective_date
+        description: |
+          Date when this ID mapping became effective.
+          
+          **Use Cases:**
+          - Track when person assumed new role (student → faculty)
+          - Track when source system changed (JCX → Colleague migration)
+          - Track when better match was found (fuzzy → exact match)
+          
+          **Current**: Set to current_date() for all initial records
+          **Future**: Will track actual role start dates
+        tests:
+          - not_null:
+              config:
+                severity: error
+      
+      - name: end_date
+        description: |
+          Date when this ID mapping ceased to be effective. NULL = currently active.
+          
+          **Use Cases:**
+          - Person graduates (STUDENT role ends)
+          - Faculty retires (FACULTY role ends)
+          - Source system decommissioned
+          - Better match superseded fuzzy match
+          
+          **Example Timeline for Jane Doe:**
+          ```
+          Role: STUDENT, effective: 2015-08-15, end_date: 2019-05-15 (graduated)
+          Role: ALUMNI,  effective: 2019-05-16, end_date: NULL (current)
+          Role: FACULTY, effective: 2020-08-20, end_date: NULL (current)
+          Role: DONOR,   effective: 2021-12-01, end_date: NULL (current)
+          ```
+      
+      - name: is_current
+        description: |
+          Boolean flag indicating if this is a currently active mapping.
+          
+          **TRUE**: This mapping is active right now
+          **FALSE**: This is historical (superseded or ended)
+          
+          **Best Practice**: ALWAYS filter on `is_current = true` when joining
+          unless you specifically need historical analysis.
+          
+          **Note**: For PERSON entities, multiple roles can be is_current=true
+          simultaneously (e.g., someone who is both FACULTY and DONOR)
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: [true, false]
+              config:
+                severity: error
+      
+      # Match Metadata
+      - name: match_confidence
+        description: |
+          Numeric score (0.0 to 1.0) indicating confidence in the match quality.
+          
+          **Scoring Guide:**
+          - 1.00: Perfect/definitive (system of record, unique ID match)
+          - 0.95-0.99: High confidence (exact SSN, exact email)
+          - 0.85-0.94: Good confidence (email + name, multiple attributes)
+          - 0.70-0.84: Medium confidence (needs review)
+          - <0.70: Low confidence (manual review required)
+          
+          **Usage by Context:**
+          - **Automated Integration**: Use matches with ≥0.85
+          - **Reporting**: Include ≥0.90
+          - **Manual Review**: Flag <0.85 for data stewards
+          
+          **Cross-Role Matching**: When linking roles for same person:
+          - Direct match (same email): 0.95
+          - Fuzzy name match: 0.85
+          - Manual steward assignment: 1.00
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+              inclusive: true
+              config:
+                severity: error
+      
+      - name: match_method
+        description: |
+          The matching strategy/algorithm used to create this ID mapping.
+          
+          **For System of Record (Primary Sources):**
+          - SYSTEM_OF_RECORD: First appearance, creates Ditteau ID
+          - NEW_PERSON: New person never seen before
+          - NEW_ORGANIZATION: New organization never seen before
+          
+          **For Secondary Sources (Cross-System Matching):**
+          - SSN_EXACT: Matched on exact SSN
+          - EMAIL_EXACT: Matched on exact email address
+          - EMAIL_LASTNAME: Matched on email + last name
+          - EMAIL_NAME: Matched on email + full name
+          - SIS_ID_DIRECT: Canvas SIS ID = JCX student_id
+          - FUZZY_NAME_DOB: Fuzzy name + date of birth
+          
+          **For Cross-Role Matching (PERSON entities):**
+          - ROLE_EMAIL_MATCH: Same person, different role, matched via email
+          - ROLE_MANUAL: Data steward manually linked roles
+          - ROLE_SSN_MATCH: Same person, different role, matched via SSN
+          
+          **Usage**: Track which strategies work best, identify records needing
+          re-matching with improved algorithms.
+        tests:
+          - not_null:
+              config:
+                severity: error
+      
+      # Metadata Columns (Standard Ditteau Pattern)
+      - name: _source_loaded_at
+        description: |
+          Timestamp from source staging model when source record was loaded.
+          Used for freshness tracking and debugging.
+      
+      - name: _source_system
+        description: Source system for metadata tracking (lineage/governance)
+        tests:
+          - not_null
+      
+      - name: _source_table
+        description: Source table name for metadata tracking
+        tests:
+          - not_null
+      
+      - name: _data_classification
+        description: |
+          Data classification level.
+          
+          **Typical Values by Entity:**
+          - PERSON entities: CONFIDENTIAL or RESTRICTED (contains PII)
+          - ORGANIZATION entities: INTERNAL (vendor data)
+          - COURSE entities: PUBLIC (course catalog)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']
+      
+      - name: _data_owner
+        description: |
+          Department/role responsible for this data.
+          
+          **By Role Type:**
+          - STUDENT: REGISTRAR
+          - FACULTY: HUMAN_RESOURCES
+          - DONOR: ADVANCEMENT
+          - VENDOR: FINANCE
+        tests:
+          - not_null
+      
+      - name: _ingest_type
+        description: Data load type (FULL_LOAD, INCREMENTAL, CDC, etc.)
+        tests:
+          - not_null
+      
+      - name: _dbt_loaded_at
+        description: Timestamp when dbt created this record
+        tests:
+          - not_null

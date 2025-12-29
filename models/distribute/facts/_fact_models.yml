@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: fact_enrollment
+    description: "Fact table representing student course enrollments"
+    columns:
+      - name: enrollment_stu_key
+        description: "Foreign key to DIM_STUDENT"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_student')
+              field: student_key
+      - name: enrollment_course_section_key
+        description: "Foreign key to DIM_COURSE_SECTION"
+        tests:
+          - not_null
+           

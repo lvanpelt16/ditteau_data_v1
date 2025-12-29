@@ -1,0 +1,36 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# Internal DEPOSIT schema (staged CSVs or Snowpipes)
+# ---------------------------------------------------------------------------
+sources:
+  - name: powerfaids
+    database: DITTEAU_DATA
+    schema: BRONZE
+    description: "Raw landing zone tables loaded internally (CSV stages, Snowpipes, etc.)."
+
+    tables:
+      - name: bronze_pf_awards
+        description: "Financial aid award data from PowerFAIDS CSV stage."
+        meta:
+          source_system: "POWERFAIDS"
+          source_file: "award.csv"
+          ingest_type: "STAGE (CSV)"
+          data_owner: "Financial Aid"
+          data_class: "Restricted"
+      - name: bronze_pf_applications
+        description: "Financial aid application data from PowerFAIDS CSV stage."
+        meta:
+          source_system: "POWERFAIDS"
+          source_file: "applications.csv"
+          ingest_type: "STAGE (CSV)"
+          data_owner: "Financial Aid"
+          data_class: "Restricted"
+      - name: bronze_pf_requirements
+        description: "Student requirement data from PowerFAIDS CSV stage."
+        meta:
+          source_system: "POWERFAIDS"
+          source_file: "requirements.csv"
+          ingest_type: "STAGE (CSV)"
+          data_owner: "Financial Aid"
+          data_class: "Restricted"

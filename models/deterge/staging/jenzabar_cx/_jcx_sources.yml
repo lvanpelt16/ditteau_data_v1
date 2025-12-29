@@ -1,0 +1,445 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# ORGDATACLOUD (Jenzabar CX) Data Share
+# ---------------------------------------------------------------------------
+sources:
+  - name: jenzabar_cx_archive
+    database: ORGDATACLOUD$INTERNAL$DITTEAU_DEMO_CX_DATA
+    schema: DITTEAU_ARCHIVE
+    description: "Tables from the Jenzabar CX data share provided via ORGDATACLOUD."
+    
+    # Source-level metadata (applies to all tables unless overridden)
+    meta:
+      source_system: JENZABAR_CX
+      ingest_type: SNOWFLAKE_DATA_SHARE
+      data_owner: DITTEAU_ARCHIVE
+      is_external_share: true
+    
+    tables:
+      # -------------------------------------------------------------------------
+      # CORE ENTITY TABLES
+      # -------------------------------------------------------------------------
+      - name: id_rec
+        description: |
+          Main entity record from Jenzabar CX data share.
+          Contains names and general information for all individuals and entities.
+          Everyone gets an id_rec - this is the master identity table.
+          
+          **Grain**: One row per person/entity
+          **Primary Key**: id (serial)
+        meta:
+          source_file: id_rec
+          data_owner: COMMON
+          data_class: PII
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: id
+            description: Serial system assigned unique identifier
+            tests:
+              - not_null
+              - unique
+          - name: fullname
+            description: Complete name (Last, First Middle,, Postfix format)
+          - name: lastname
+            description: Last or family name
+          - name: firstname
+            description: First or given name
+          - name: ss_no
+            description: Social Security Number or Federal ID
+          - name: birth_date
+            description: Date of birth (copy from profile_rec)
+      
+      - name: profile_rec
+        description: |
+          Person profile and demographic information from Jenzabar CX.
+          Contains detailed personal information maintained throughout person's 
+          relationship with institution. Never deleted.
+          
+          **Grain**: One row per person
+          **Primary Key**: id (references id_rec.id)
+        meta:
+          source_file: profile_rec
+          data_owner: COMMON
+          data_class: PII
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: id
+            description: Person identifier (links to id_rec)
+            tests:
+              - not_null
+              - unique
+          - name: ethnic_code
+            description: Ethnic background code
+          - name: race
+            description: Race code
+          - name: sex
+            description: Gender/sex code
+          - name: birth_date
+            description: Date of birth
+          - name: citz
+            description: Citizenship status code
+          - name: visa_code
+            description: Visa/immigration status code
+          - name: vet
+            description: Veteran status (Y/N)
+            
+      - name: aa_rec
+        description: |
+          Alternate address records from Jenzabar CX data share.
+          Contains all types of alternate addresses including email, home, work, 
+          seasonal, and emergency contact information. Email addresses are stored 
+          as alternate addresses with AA code indicating email type.
+    
+          **Grain**: One row per person per address type per time period
+          **Primary Key**: aa_no (address_number)
+          **Business Key**: id (person_id) + aa (address_type_code) + beg_date
+    
+          **Important**: Email addresses are stored in LINE1 where AA type indicates email.
+           Query aa_table.EMAIL='Y' to identify email address types.
+          meta:
+            source_file: aa_rec
+            data_owner: COMMON
+            data_class: PII
+          freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+         - name: aa_no
+           description: System-generated unique number for each address record (surrogate key)
+           tests:
+             - not_null
+             - unique
+         - name: id
+           description: Person identifier (links to id_rec.id)
+           tests:
+             - not_null
+             - relationships:
+                   to: source('jenzabar_cx_archive', 'id_rec')
+                   field: id
+         - name: aa
+           description: |
+             Address type code (e.g., PERM, MAIL, WORK, *EML* for email).
+             Links to aa_table for description and type classification.
+           tests:
+             - not_null
+         - name: beg_date
+           description: Date alternate address becomes effective
+         - name: end_date
+           description: |
+            Date alternate address is no longer effective.
+            NULL indicates current/active address. Filter for NULL to get active records.
+         - name: peren
+           description: |
+             Effective yearly flag (Y/N).
+             Indicates whether address is effective every year between begin and end month/day.
+         - name: line1
+           description: |
+             First line of address. 
+             **For email addresses**: Contains the email address itself.
+             **For physical addresses**: Contains street address.
+         - name: line2
+           description: Second line of address (apartment, suite, etc.)
+         - name: line3
+           description: Third line of address
+         - name: city
+           description: City name
+         - name: st
+           description: State/province postal code abbreviation
+         - name: zip
+           description: Postal/ZIP code
+         - name: ctry
+           description: Country code
+         - name: phone
+           description: Phone number at this address
+         - name: phone_ext
+           description: Phone extension at this address
+         - name: ctry_prefix
+           description: International country dialing prefix
+         - name: ofc_add_by
+           description: Office code that created this record
+         - name: cass_cert_date
+           description: Date address was last CASS certified (postal validation)
+
+      # -------------------------------------------------------------------------
+      # ADMISSIONS
+      # -------------------------------------------------------------------------
+      - name: adm_rec
+        description: "Admission records from Jenzabar CX data share."
+        meta:
+          source_file: adm_rec
+          data_owner: ADMISSIONS
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      # -------------------------------------------------------------------------
+      # STUDENT ACADEMIC RECORDS
+      # -------------------------------------------------------------------------
+      - name: prog_enr_rec
+        description: |
+          Program enrollment records containing student academic program information,
+          including majors, minors, concentrations, and enrollment status.
+          
+          **Grain**: One row per student per program enrollment
+          **Primary Key**: id (student_id) + prog (program_code)
+        meta:
+          source_file: prog_enr_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: id
+            description: Student identifier (maps to student_id)
+            tests:
+              - not_null
+          - name: prog
+            description: Program code
+            tests:
+              - not_null
+          - name: subprog
+            description: Subprogram code
+          - name: deg
+            description: Degree code (e.g., BA, BS, MA)
+          - name: major_1
+            description: Primary major code
+          - name: major_2
+            description: Secondary major code
+          - name: minor_1
+            description: Primary minor code
+          - name: minor_2
+            description: Secondary minor code
+          - name: conc1
+            description: Primary concentration code
+          - name: conc2
+            description: Secondary concentration code
+          - name: cl
+            description: Class standing code (FR, SO, JR, SR)
+          - name: advisor
+            description: Faculty advisor identifier
+          - name: curenr
+            description: Current enrollment status code
+          - name: cur_stat
+            description: Current status indicator
+          - name: stat_date
+            description: Status effective date
+          - name: enroll_date
+            description: Date student enrolled in program
+          - name: accept_date
+            description: Date student was accepted to program
+          - name: plan_grad_yr
+            description: Expected graduation year
+          - name: plan_grad_sess
+            description: Expected graduation term/session
+          - name: deg_cde
+            description: Degree code indicator (presence indicates degree-seeking)
+      
+      - name: stu_acad_rec
+        description: "Term-based student academic record from Jenzabar CX data share."
+        meta:
+          source_file: stu_acad_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      - name: stu_stat_rec
+        description: "Student statistical summary record from Jenzabar CX data share."
+        meta:
+          source_file: stu_stat_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      # -------------------------------------------------------------------------
+      # COURSE & SECTION RECORDS
+      # -------------------------------------------------------------------------
+      - name: crs_rec
+        description: "Course catalog record from Jenzabar CX data share."
+        meta:
+          source_file: crs_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      - name: sec_rec
+        description: "Course section record from Jenzabar CX data share."
+        meta:
+          source_file: sec_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+
+      - name: secmtg_rec
+        description: "Course section and meeting record from Jenzabar CX data share."
+        meta:
+          source_file: secmtg_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      
+      - name: mtg_rec
+        description: "Meeting/schedule record from Jenzabar CX data share."
+        meta:
+          source_file: mtg_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+      
+      - name: reg_rec
+        description: "Course registration records from Jenzabar CX data share."
+        meta:
+          source_file: reg_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      - name: cw_rec
+        description: "Course work/grade records from Jenzabar CX data share."
+        meta:
+          source_file: cw_rec
+          data_owner: REGISTRAR
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      # -------------------------------------------------------------------------
+      # FACULTY
+      # -------------------------------------------------------------------------
+      - name: fac_rec
+        description: "Faculty record from Jenzabar CX data share."
+        meta:
+          source_file: fac_rec
+          data_owner: COMMON
+          data_class: INTERNAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      # -------------------------------------------------------------------------
+      # STUDENT FINANCIAL RECORDS
+      # -------------------------------------------------------------------------
+      - name: sbcust_rec
+        description: "Student billing customer record from Jenzabar CX data share."
+        meta:
+          source_file: sbcust_rec
+          data_owner: BURSAR
+          data_class: FINANCIAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      - name: stu_serv_rec
+        description: "Student service/charge record from Jenzabar CX data share."
+        meta:
+          source_file: stu_serv_rec
+          data_owner: BURSAR
+          data_class: FINANCIAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      - name: suba_rec
+        description: "Subsidiary account record from Jenzabar CX data share."
+        meta:
+          source_file: suba_rec
+          data_owner: BURSAR
+          data_class: FINANCIAL
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      
+      # -------------------------------------------------------------------------
+      # CONTACT RECORDS
+      # -------------------------------------------------------------------------
+      - name: ctc_rec
+        description: "Contact records from Jenzabar CX data share."
+        meta:
+          source_file: ctc_rec
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      # -------------------------------------------------------------------------
+      # REFERENCE/LOOKUP TABLES
+      # -------------------------------------------------------------------------
+      - name: acad_cal_rec
+        description: "Academic calendar record from Jenzabar CX data share."
+        meta:
+          source_file: acad_cal_rec
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: grd_table
+        description: "Grade table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: grd_table
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: major_table
+        description: "Major table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: major_table
+          data_owner: COMMON
+          data_class: INTERNAL
+     
+      - name: dept_table
+        description: "Major table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: dept_table
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: deg_table
+        description: "Degree table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: deg_table
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: ctc_table
+        description: "Contact type table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: ctc_table
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: ethnic_table
+        description: "Ethnicity table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: ethnic_table
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: acad_stat_table
+        description: "Academic status table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: acad_stat_table
+          data_owner: COMMON
+          data_class: INTERNAL
+      
+      - name: aa_table
+        description: "Alternate address table/lookup from Jenzabar CX data share."
+        meta:
+          source_file: aa_table
+          data_owner: COMMON
+          data_class: INTERNAL

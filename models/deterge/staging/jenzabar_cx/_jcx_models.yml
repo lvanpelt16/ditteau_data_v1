@@ -1,0 +1,549 @@
+version: 2
+
+models:
+  # =========================================================================
+  # CORE ENTITY MODELS
+  # =========================================================================
+  
+  - name: stg_jcx__id
+    description: |
+      Staging model for entity identification records from Jenzabar CX.
+      Contains names and general information for all individuals and entities.
+      This is the base identity table that everyone gets.
+      
+      **Grain**: One row per person/entity (unique ID)
+      **Source**: jenzabar_cx_archive.id_rec (DEPOSIT schema)
+      **Materialization**: View
+      **Updates**: Refreshed with each dbt run
+      **Owner**: Common / Registrar
+      
+      **Key Relationships**:
+      - Referenced by: profile_rec, prog_enr_rec, adm_rec, fac_rec, and most other tables
+      - This is the master identity table for the institution
+    
+    config:
+      tags: ['staging', 'jenzabar', 'person', 'common']
+    
+    tests:
+      - dbt_utils.recency:
+          datepart: day
+          field: updated_date
+          interval: 7
+    
+    columns:
+      - name: person_id
+        description: |
+          Unique serial system assigned number identifying this person/entity.
+          This is the primary institutional identifier.
+        tests:
+          - not_null
+          - unique
+        meta:
+          primary_key: true
+      
+      - name: full_name
+        description: |
+          Complete name in format: Last_Name, First_Name Middle_Initial,, Postfix
+        tests:
+          - not_null
+      
+      - name: last_name
+        description: Last or family name of the person
+        tests:
+          - not_null
+      
+      - name: first_name
+        description: First or given name of the person
+      
+      - name: middle_name
+        description: Middle name(s) of the person
+      
+      - name: ssn
+        description: |
+          Social Security Number or Federal ID.
+          Format: XXX-XX-XXXX for persons, Federal ID for businesses.
+        meta:
+          contains_pii: true
+      
+      - name: is_deceased
+        description: Boolean indicating if this entity is deceased
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: birth_date
+        description: Date of birth (copy from profile_rec for query convenience)
+        meta:
+          contains_pii: true
+
+  - name: stg_jcx__profile
+    description: |
+      Staging model for person profile/demographic information from Jenzabar CX.
+      Contains detailed personal information maintained throughout a person's 
+      relationship with the institution. This file is never deleted.
+      
+      **Grain**: One row per person (unique person_id)
+      **Source**: jenzabar_cx_archive.profile_rec (DEPOSIT schema)
+      **Materialization**: View
+      **Updates**: Refreshed with each dbt run
+      **Owner**: Common / Institutional Research
+      
+      **Key Relationships**:
+      - Links to: id_rec via person_id
+      - Contains: Demographic, citizenship, veteran status, accessibility info
+      
+      **Data Sensitivity**: Contains PII and demographic information
+    
+    config:
+      tags: ['staging', 'jenzabar', 'person', 'common', 'pii']
+    
+    tests:
+      - dbt_utils.recency:
+          datepart: day
+          field: last_updated_date
+          interval: 7
+    
+    columns:
+      - name: person_id
+        description: |
+          Identifies the person this profile information refers to.
+          Links to id_rec.id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: source('jenzabar_cx_archive', 'id_rec')
+              field: id
+        meta:
+          primary_key: true
+      
+      # Demographic Information
+      - name: ethnic_code
+        description: |
+          Ethnic background code.
+          References ethnic_table for descriptions.
+        meta:
+          maps_to: ethnic_table
+      
+      - name: race_code
+        description: Race code for this person
+      
+      - name: is_hispanic
+        description: Boolean indicating if person is Hispanic
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: gender_code
+        description: |
+          Biological sex code.
+          Common values: M (Male), F (Female)
+        meta:
+          example_values: ['M', 'F']
+      
+      - name: gender_identity_code
+        description: Gender identity code (self-identified)
+      
+      - name: pronoun_code
+        description: Preferred pronoun code
+      
+      # Age & Birth Information
+      - name: birth_date
+        description: Date of birth
+        meta:
+          contains_pii: true
+      
+      - name: age
+        description: Calculated age in years
+      
+      - name: birth_city
+        description: City where person was born
+      
+      - name: birth_state_code
+        description: State where person was born
+      
+      # Residency
+      - name: resident_state_code
+        description: State where person currently resides
+      
+      - name: resident_county_code
+        description: County where person resides
+      
+      - name: resident_country_code
+        description: Country where person resides
+      
+      - name: residence_status_code
+        description: |
+          Residence status for fee purposes.
+          Used primarily by California Community Colleges.
+      
+      - name: residence_status_date
+        description: Date person first moved to current residence
+      
+      # Citizenship & Immigration
+      - name: citizenship_code
+        description: |
+          Citizenship status code.
+          References citizenship table.
+        meta:
+          maps_to: citizenship_table
+      
+      - name: citizenship_status_code
+        description: |
+          Citizen status indicator.
+          Values: US (US Citizen), RA (Resident Alien), IS (International Student)
+        meta:
+          example_values: ['US', 'RA', 'IS']
+      
+      - name: is_resident_alien
+        description: Boolean indicating if person is a resident alien
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: visa_code
+        description: American residential status / visa type code
+      
+      - name: visa_date
+        description: Visa begin or expiration date
+      
+      - name: visa_number
+        description: Visa number associated with student's visa
+      
+      # Military/Veteran
+      - name: is_veteran
+        description: Boolean indicating if person is a veteran
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: veteran_chapter_code
+        description: Veteran's chapter association code
+      
+      - name: military_branch_code
+        description: |
+          Branch of military in which person served.
+          Examples: ARMY, NAVY, USAF, USMC, USCG
+      
+      # Accessibility
+      - name: disability_code
+        description: Disability/handicap code if applicable
+      
+      # Religious Affiliation
+      - name: denomination_code
+        description: Religious denomination preference code
+      
+      - name: home_church_id
+        description: |
+          ID of person's home church.
+          References id_rec for church entities.
+      
+      # Additional Information
+      - name: marital_status_code
+        description: |
+          Current marital status.
+          Common values: S (Single), M (Married), D (Divorced), W (Widowed)
+        meta:
+          example_values: ['S', 'M', 'D', 'W']
+      
+      - name: occupation_code
+        description: Occupation code
+      
+      - name: privacy_code
+        description: Privacy code/level for this person
+      
+      - name: primary_language_code
+        description: Primary language used by person
+      
+      # Media Relations
+      - name: primary_newspaper_id
+        description: ID of primary newspaper for information release
+      
+      - name: secondary_newspaper_id
+        description: ID of secondary newspaper for information release
+      
+      # Registration
+      - name: registration_group_number
+        description: Registration time group number
+      
+      # Housing/Room Draw
+      - name: can_participate_in_roomdraw
+        description: Indicates if person can participate in room draw
+      
+      - name: roomdraw_group_number
+        description: Room draw group assignment
+      
+      - name: roomdraw_random_number
+        description: Random number for assigning room draw groups
+      
+      # Death Information
+      - name: deceased_date
+        description: Date of death (if applicable)
+      
+      # Financial Aid
+      - name: national_student_loan_clearinghouse_number
+        description: NSLC number for student loan tracking
+      
+      # Dependency
+      - name: annual_dependency_disclosure_code
+        description: Annual dependency disclosure status code
+      
+      - name: annual_dependency_disclosure_date
+        description: Date of annual dependency disclosure
+      
+      # Administrative
+      - name: last_updated_date
+        description: Date profile was last modified
+      
+      # Binary Data
+      - name: photo_image
+        description: Photograph in GIF format (binary/byte field)
+      
+      # Metadata columns
+      - name: _source_system
+        description: Source system identifier (JENZABAR_CX)
+        tests:
+          - not_null
+      
+      - name: _source_table
+        description: Source table name (PROFILE_REC)
+        tests:
+          - not_null
+      
+      - name: _data_classification
+        description: Data classification level (PII)
+        tests:
+          - not_null
+      
+      - name: _data_owner
+        description: Data owner department (COMMON)
+        tests:
+          - not_null
+      
+      - name: _ingest_type
+        description: Ingestion method (SNOWFLAKE_DATA_SHARE)
+        tests:
+          - not_null
+      
+      - name: _dbt_loaded_at
+        description: Timestamp when dbt processed this record
+        tests:
+          - not_null
+
+  # =========================================================================
+  # STUDENT ACADEMIC MODELS
+  # =========================================================================
+  
+  - name: stg_jcx__students
+    description: |
+      Staging model for student program enrollment data from Jenzabar CX.
+      This model provides a cleaned and standardized view of student academic programs,
+      including degree programs, majors, minors, concentrations, and enrollment status.
+      
+      **Grain**: One row per student per program enrollment
+      **Source**: jenzabar_cx_archive.prog_enr_rec (DEPOSIT schema)
+      **Materialization**: View
+      **Updates**: Refreshed with each dbt run
+      **Owner**: Registrar / Institutional Research
+      
+      **Transformations Applied**:
+      - Renamed columns to institutional standards (snake_case)
+      - Cast date fields to DATE type
+      - Created boolean flags for is_active and is_degree_seeking
+      - Added standardized metadata columns via macro
+      
+      **Usage**: This staging model should be used as the base for:
+      - int_students (integrated student view)
+      - dim_student (student dimension in Distribute)
+      - Any analysis requiring program enrollment information
+    
+    config:
+      tags: ['staging', 'jenzabar', 'student']
+    
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - student_id
+            - program_code
+    
+    columns:
+      # Primary Keys
+      - name: student_id
+        description: |
+          Unique student identifier from Jenzabar (ID_REC).
+          This is the institutional student ID used across all systems.
+        tests:
+          - not_null
+          - relationships:
+              to: source('jenzabar_cx_archive', 'id_rec')
+              field: id
+        meta:
+          primary_key: true
+      
+      - name: program_code
+        description: |
+          Academic program code.
+          Examples: UNDECIDED, BA-BIOL, BS-CHEM, MBA
+        tests:
+          - not_null
+        meta:
+          primary_key: true
+      
+      - name: subprogram_code
+        description: Subprogram or specialization code within the main program
+      
+      # Identifiers
+      - name: degree_code
+        description: |
+          Degree type code that the student is pursuing.
+          Examples: BA (Bachelor of Arts), BS (Bachelor of Science), 
+          MA (Master of Arts), MS (Master of Science), MBA, PHD
+      
+      - name: primary_major
+        description: |
+          Student's primary major code.
+          Maps to major_table for descriptions.
+        meta:
+          maps_to: major_table
+      
+      - name: secondary_major
+        description: |
+          Student's secondary major code (if double major).
+          Maps to major_table for descriptions.
+        meta:
+          maps_to: major_table
+      
+      - name: primary_minor
+        description: Student's primary minor code
+      
+      - name: secondary_minor
+        description: Student's secondary minor code (if applicable)
+      
+      - name: primary_concentration
+        description: Primary concentration or track within major
+      
+      - name: secondary_concentration
+        description: Secondary concentration or track within major
+      
+      # Academic Information
+      - name: class_standing_code
+        description: |
+          Student's class standing code.
+          Common values:
+          - FR = Freshman
+          - SO = Sophomore
+          - JR = Junior
+          - SR = Senior
+          - GR = Graduate
+        meta:
+          example_values: ['FR', 'SO', 'JR', 'SR', 'GR']
+      
+      - name: advisor_id
+        description: |
+          Faculty advisor identifier.
+          References id_rec or fac_rec for faculty information.
+        meta:
+          maps_to: fac_rec
+      
+      # Status
+      - name: current_enrollment_status_code
+        description: Current enrollment status in this program
+      
+      - name: current_status_date
+        description: Date when the current status became effective
+      
+      # Dates
+      - name: program_entrance_date
+        description: Date student enrolled in this program
+      
+      - name: program_acceptance_date
+        description: Date student was accepted into this program
+      
+      # Expected Graduation
+      - name: expected_graduation_year
+        description: Year student expects to graduate from this program
+      
+      - name: expected_graduation_term
+        description: Term/session student expects to graduate
+      
+      # Flags
+      - name: is_active
+        description: |
+          Boolean flag indicating if the student is currently active in this program.
+          Based on cur_stat values: A, C, G, H are considered active.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_degree_seeking
+        description: |
+          Boolean flag indicating if the student is seeking a degree in this program.
+          True if deg_cde is populated.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      # Metadata columns (added by add_source_metadata macro)
+      - name: _source_system
+        description: |
+          Source system identifier.
+          Value: 'JENZABAR_CX' (from source meta)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['JENZABAR_CX']
+      
+      - name: _source_table
+        description: |
+          Source table name in uppercase.
+          Value: 'PROG_ENR_REC' (auto-generated by macro)
+        tests:
+          - not_null
+      
+      - name: _source_file
+        description: |
+          Source file name (if applicable from source meta).
+          Value: 'prog_enr_rec' (from source meta)
+      
+      - name: _data_classification
+        description: |
+          Data classification level.
+          Value: 'INTERNAL' (from source meta)
+          
+          Possible values:
+          - PUBLIC: Can be freely shared externally
+          - INTERNAL: For institutional use only
+          - CONFIDENTIAL: Sensitive data, restricted access
+          - RESTRICTED: Highly sensitive (PII, FERPA, etc.)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']
+      
+      - name: _data_owner
+        description: |
+          Data owner or steward department.
+          Value: 'REGISTRAR' (from source meta)
+        tests:
+          - not_null
+      
+      - name: _ingest_type
+        description: |
+          Type of data ingestion method.
+          Value: 'SNOWFLAKE_DATA_SHARE' (from source meta)
+          
+          Possible values:
+          - FULL_LOAD: Complete refresh of all records
+          - INCREMENTAL: Only new/changed records
+          - CDC: Change Data Capture
+          - SNOWFLAKE_DATA_SHARE: Snowflake data sharing
+          - API_SYNC: API synchronization
+        tests:
+          - not_null
+      
+      - name: _dbt_loaded_at
+        description: |
+          Timestamp when dbt processed this record.
+          Generated by macro using current_timestamp() at transformation time.
+        tests:
+          - not_null

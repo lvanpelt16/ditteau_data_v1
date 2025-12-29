@@ -1,0 +1,54 @@
+ditteau_data_v1:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: SYAXLGH-DATA_PLATFORM  # Consider using env var
+      user: "{{ env_var('DBT_SNOWFLAKE_USER', 'LVANPELT') }}"
+      # Use authenticator for SSO or password/key
+      authenticator: externalbrowser  # For SSO
+      # OR for key-pair auth:
+      # private_key_path: /path/to/key.p8
+      # private_key_passphrase: "{{ env_var('DBT_KEY_PASSPHRASE') }}"
+      
+      role: TRANSFORM_DEV_ROLE
+      database: DITTEAU_DATA
+      warehouse: TRANSFORM_WH
+      schema: DETERGE_DEV  # Default schema (overridden by dbt_project.yml)
+      threads: 4
+      client_session_keep_alive: True  # Change to True for dev
+      query_tag: "dbt_dev_{{ env_var('USER', 'unknown') }}"  # Track queries
+      
+    prod:
+      type: snowflake
+      account: SYAXLGH-DATA_PLATFORM
+      user: "{{ env_var('DBT_CLOUD_PROD_USER') }}"  # From environment
+      # Key-pair auth for service accounts
+      authenticator: snowflake_jwt
+      private_key_path: "{{ env_var('DBT_PROD_KEY_PATH') }}"
+      private_key_passphrase: "{{ env_var('DBT_PROD_KEY_PASS') }}"
+      
+      role: TRANSFORM_PROD_ROLE
+      database: DITTEAU_DATA
+      warehouse: TRANSFORM_WH
+      schema: DETERGE  # Default schema
+      threads: 8
+      client_session_keep_alive: True
+      query_tag: "dbt_prod_{{ env_var('DBT_CLOUD_JOB_ID', 'manual') }}"
+      
+    # Add a CI target for pull requests
+    ci:
+      type: snowflake
+      account: SYAXLGH-DATA_PLATFORM
+      user: "{{ env_var('DBT_CLOUD_PROD_USER') }}"
+      authenticator: snowflake_jwt
+      private_key_path: "{{ env_var('DBT_PROD_KEY_PATH') }}"
+      private_key_passphrase: "{{ env_var('DBT_PROD_KEY_PASS') }}"
+      
+      role: TRANSFORM_DEV_ROLE  # Use dev role for CI
+      database: DITTEAU_DATA
+      warehouse: TRANSFORM_WH
+      schema: DETERGE_CI  # Separate CI schema
+      threads: 4
+      client_session_keep_alive: False
+      query_tag: "dbt_ci_{{ env_var('DBT_CLOUD_PR_ID', 'manual') }}"
