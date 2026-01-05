@@ -1,6 +1,5 @@
 {{ config(
-    materialized='table',
-    schema='GOLD',
+    materialized='table'
     alias='DIM_TERM',
     tags=['gold', 'dimension']
 ) }}

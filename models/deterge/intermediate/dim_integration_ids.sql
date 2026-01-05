@@ -4,7 +4,6 @@
         unique_key='scd_id',
         incremental_strategy='merge',
         on_schema_change='fail',
-        schema='deterge',
         cluster_by=['ditteau_id', 'entity_type', 'is_current'],
         tags=['integration', 'id_resolution', 'core', 'scd_type_2', 'multi_source']
     )

@@ -1,6 +1,5 @@
 {{ config(
-    materialized = 'table',
-    schema = 'DISTRIBUTE'
+    materialized = 'table'
 ) }}
 select
     row_number() over (order by course_number) as course_key,  -- ✅ ADD

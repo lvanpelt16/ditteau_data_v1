@@ -1,6 +1,5 @@
 {{ config(
-    materialized = 'table',
-    schema = 'DISTRIBUTE'
+    materialized = 'table'
 ) }}
 
 select

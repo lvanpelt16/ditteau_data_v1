@@ -1,7 +1,6 @@
 {{
     config(
-        materialized='table',
-        schema='deterge',
+        materialized='table'
         tags=['intermediate', 'academic', 'enrollment']
     )
 }}

@@ -1,7 +1,6 @@
 {{
     config(
         materialized='table',
-        schema='deterge',
         tags=['integration', 'students', 'core', 'golden_record']
     )
 }}

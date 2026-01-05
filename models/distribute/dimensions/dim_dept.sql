@@ -1,6 +1,5 @@
 {{ config(
-    materialized = 'table',
-    schema = 'DISTRIBUTE'
+    materialized = 'table'
 ) }}
 select
     DEPT as dept_code,  -- Uppercase column names

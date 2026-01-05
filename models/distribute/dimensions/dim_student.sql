@@ -1,6 +1,5 @@
 {{ config(
-    materialized = 'table',
-    schema = 'DISTRIBUTE'
+    materialized = 'table'
 ) }}
 select
     row_number() over (order by a.person_id) as student_key,  -- ✅ ADD THIS SURROGATE KEY

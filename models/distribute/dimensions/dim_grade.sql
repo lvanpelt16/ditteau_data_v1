@@ -1,6 +1,5 @@
 {{ config(
-    materialized = 'table',
-    schema = 'DISTRIBUTE'
+    materialized = 'table'
 ) }}
 select
     row_number() over (order by GRD) as grade_key,  -- ✅ ADD (uppercase source)
