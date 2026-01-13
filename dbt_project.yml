@@ -1,18 +1,35 @@
+# =============================================================================
+# Ditteau Data v1 - dbt Project Configuration
+# =============================================================================
+# This configuration supports multi-environment deployment with separate
+# databases for DEV, TEST, and PROD environments.
+#
+# Database structure:
+#   - DEV:  DITTEAU_DATA_DEV.{deposit, deterge, distribute}
+#   - TEST: DITTEAU_DATA_TEST.{deposit, deterge, distribute}
+#   - PROD: DITTEAU_DATA_PROD.{deposit, deterge, distribute}
+#
+# The database name comes from profiles.yml based on target.
+# Schema names are consistent across all environments.
+# =============================================================================
+
 name: ditteau_data_v1
 version: 1.0.0
 config-version: 2
 
+# Profile name (must match profiles.yml)
 profile: ditteau_data_v1
 
-
-# File paths
+# =============================================================================
+# File Paths
+# =============================================================================
 model-paths: ["models"]
 analysis-paths: ["analyses"]
 test-paths: ["tests"]
 seed-paths: ["seeds"]
 macro-paths: ["macros"]
-snapshot-paths: ["snapshots"]  # Add this for SCD Type 2
-docs-paths: ["docs"]  # Add for custom documentation
+snapshot-paths: ["snapshots"]
+docs-paths: ["docs"]
 
 # Where compiled artifacts go
 target-path: "target"
@@ -20,117 +37,171 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
-# Variables for flexibility
+# =============================================================================
+# Project Variables
+# =============================================================================
 vars:
-  # Current academic year - update this each fall
+  # Current academic year - update each fall
   current_academic_year: '2024-2025'
   current_term_code: 'FA24'
   
-  # Source system prefixes
+  # Source system prefixes for naming conventions
   jenzabar_prefix: 'jcx'
   powerfaids_prefix: 'pf'
+  workday_prefix: 'wd'
   
-  # Date thresholds
+  # Data retention and historical analysis
   historical_cutoff_years: 10
+  
+  # Feature flags for optional functionality
+  enable_masking_policies: false  # Set to true in PROD
+  enable_row_level_security: false  # Set to true in PROD
 
-# Model configurations
+# =============================================================================
+# Model Configurations
+# =============================================================================
 models:
   ditteau_data_v1:
-    +database: DITTEAU_DATA
-    +materialized: view  # Safe default
-    +on_schema_change: "sync_all_columns"  # Auto-adjust to schema changes
+    # Global defaults
+    +materialized: view
+    +on_schema_change: sync_all_columns
     
-    # DEPOSIT layer - Raw sources as views
+    # ---------------------------------------------------------------------------
+    # DEPOSIT LAYER (Bronze) - Raw data landing zone
+    # ---------------------------------------------------------------------------
+    # Note: Deposit models are typically loaded externally (stages, shares, ETL)
+    # dbt primarily references these as sources, not builds them
     deposit:
-      +schema: DEPOSIT
+      +schema: deposit
       +materialized: view
-      +tags: ['bronze', 'raw']
+      +tags: ['bronze', 'raw', 'deposit']
       +meta:
         layer: 'bronze'
         contains_pii: true
         owner: 'data_engineering'
     
-    # DETERGE layer - Cleaned and conformed
+    # ---------------------------------------------------------------------------
+    # DETERGE LAYER (Silver) - Cleaned, conformed, and integrated
+    # ---------------------------------------------------------------------------
     deterge:
-      +schema: "{{ 'DETERGE_DEV' if target.name == 'dev' else 'DETERGE' }}"
+      +schema: deterge
       +materialized: table
-      +tags: ['silver', 'cleaned']
+      +tags: ['silver', 'cleaned', 'deterge']
       +meta:
         layer: 'silver'
         owner: 'data_engineering'
       
-      # Core staging area
+      # Staging models - lightweight source conformance
       staging:
-        +materialized: view  # Staging should be lightweight
+        +materialized: view
         +tags: ['silver', 'staging']
+        +meta:
+          purpose: 'Source-specific cleaning and standardization'
       
-      # Intermediate transformations
+      # Intermediate models - cross-source integration
       intermediate:
-        +materialized: ephemeral  # Don't persist, just for dependency
+        +materialized: table
         +tags: ['silver', 'intermediate']
+        +meta:
+          purpose: 'Cross-source joins and business logic'
       
-      # Conformed dimensions and facts
+      # Core conformed models (if you have a separate core folder)
       core:
         +materialized: table
         +tags: ['silver', 'core', 'conformed']
     
-    # DISTRIBUTE layer - Business-ready marts
+    # ---------------------------------------------------------------------------
+    # DISTRIBUTE LAYER (Gold) - Analytics-ready dimensional models
+    # ---------------------------------------------------------------------------
     distribute:
-      +schema: "{{ 'DISTRIBUTE_DEV' if target.name == 'dev' else 'DISTRIBUTE' }}"
+      +schema: distribute
       +materialized: table
-      +tags: ['gold', 'analytics']
+      +tags: ['gold', 'analytics', 'distribute']
       +meta:
         layer: 'gold'
         owner: 'data_engineering'
       
-      # Dimensional models
+      # Dimensional models (star schema)
       dimensions:
         +materialized: table
         +tags: ['gold', 'dimension']
+        +meta:
+          model_type: 'dimension'
       
       # Fact tables
       facts:
         +materialized: table
         +tags: ['gold', 'fact']
         +meta:
+          model_type: 'fact'
           grain_documented: true
       
-      # Analytics-ready marts by domain
+      # Business data marts by functional area
       enrollment:
         +materialized: table
         +tags: ['gold', 'mart', 'enrollment']
         +meta:
           business_owner: 'enrollment_team'
+          domain: 'enrollment'
       
       financial_aid:
         +materialized: table
         +tags: ['gold', 'mart', 'financial_aid']
         +meta:
           business_owner: 'financial_aid_office'
+          domain: 'financial_aid'
       
       academic:
         +materialized: table
         +tags: ['gold', 'mart', 'academic']
         +meta:
           business_owner: 'registrar'
+          domain: 'academic'
 
-# Snapshot configurations (for SCD Type 2)
+# =============================================================================
+# Snapshot Configurations (SCD Type 2)
+# =============================================================================
 snapshots:
   ditteau_data_v1:
-    +target_database: DITTEAU_DATA
-    +target_schema: "{{ 'DETERGE_DEV' if target.name == 'dev' else 'DETERGE' }}"
+    +target_schema: deterge  # Snapshots go in deterge schema
     +strategy: timestamp
     +unique_key: id
     +updated_at: updated_at
+    +tags: ['snapshot', 'scd_type_2']
 
-# Seed configurations (for reference data)
+# =============================================================================
+# Seed Configurations (Reference/Lookup Data)
+# =============================================================================
 seeds:
   ditteau_data_v1:
-    +database: DITTEAU_DATA
-    +schema: DEPOSIT
+    +schema: deposit  # Seeds go in deposit schema
     +tags: ['seed', 'reference']
-    # Example seed configs
+    +quote_columns: false
+    
+    # Specific seed configurations
     academic_calendars:
       +column_types:
         term_start_date: date
         term_end_date: date
+        term_code: varchar(10)
+
+# =============================================================================
+# Test Configurations
+# =============================================================================
+tests:
+  ditteau_data_v1:
+    +store_failures: true
+    +schema: dbt_test_results
+
+# =============================================================================
+# Documentation
+# =============================================================================
+# Custom documentation is in docs/ folder
+# Layer overviews are in models/[layer]/_[layer]_overview.md
+
+# =============================================================================
+# Dispatch Configuration (for dbt packages)
+# =============================================================================
+dispatch:
+  - macro_namespace: dbt_utils
+    search_order: ['ditteau_data_v1', 'dbt_utils']

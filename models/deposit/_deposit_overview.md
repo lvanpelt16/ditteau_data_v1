@@ -185,7 +185,7 @@ version: 2
 sources:
   - name: jcx
     description: Jenzabar CX source tables in Deposit schema
-    database: "{{ env_var('DBT_DATABASE', 'DEV_DITTEAU_DATA') }}"
+    database: "{{ target.database }}"
     schema: deposit
     
     tables:

@@ -5,8 +5,7 @@ version: 2
 # ---------------------------------------------------------------------------
 sources:
   - name: powerfaids
-    database: DITTEAU_DATA
-    schema: BRONZE
+    schema: DEPOSIT
     description: "Raw landing zone tables loaded internally (CSV stages, Snowpipes, etc.)."
 
     tables:

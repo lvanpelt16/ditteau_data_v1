@@ -2,7 +2,6 @@ version: 2
 
 sources:
   - name: workday
-    database: DITTEAU_DATA
     schema: DEPOSIT
     description: |
       Workday Student source data - NEW system of record replacing Jenzabar CX.

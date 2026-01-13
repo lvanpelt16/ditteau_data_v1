@@ -7,6 +7,6 @@ SELECT
     column_name,
     data_type,
     ordinal_position
-FROM DITTEAU_DATA.INFORMATION_SCHEMA.COLUMNS
+FROM {{ target.database }}.INFORMATION_SCHEMA.COLUMNS
 WHERE table_schema IN ('DEPOSIT', 'DETERGE', 'DISTRIBUTE')
 ORDER BY table_schema, table_name, ordinal_position
