@@ -2,3 +2,8 @@
 target/
 dbt_modules/
 logs/
+
+# Environment variables
+.env
+
+.user.yml
