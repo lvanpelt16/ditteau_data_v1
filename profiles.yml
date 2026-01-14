@@ -1,3 +1,7 @@
+# profiles.yml - Safe to commit (no secrets)
+# This file is used by Snowflake Workspaces
+# Local development should use ~/.dbt/profiles.yml with secure credentials
+
 ditteau_data_v1:
   target: dev
   outputs:
@@ -8,10 +12,13 @@ ditteau_data_v1:
       warehouse: TRANSFORM_DEV
       schema: deterge
       role: SYSADMIN
-      authenticator: snowflake
+      authenticator: snowflake  # Workspaces uses session auth
       threads: 4
-   
-    type: snowflake
+      client_session_keep_alive: True
+      query_tag: dbt_dev
+      
+    test:
+      type: snowflake
       account: syaxlgh-data-platform
       database: DITTEAU_DATA_TEST
       warehouse: TRANSFORM_TEST
@@ -19,7 +26,9 @@ ditteau_data_v1:
       role: SYSADMIN
       authenticator: snowflake
       threads: 4
-        
+      client_session_keep_alive: True
+      query_tag: dbt_test
+      
     prod:
       type: snowflake
       account: syaxlgh-data-platform
@@ -29,4 +38,5 @@ ditteau_data_v1:
       role: SYSADMIN
       authenticator: snowflake
       threads: 8
-  
+      client_session_keep_alive: True
+      query_tag: dbt_prod
