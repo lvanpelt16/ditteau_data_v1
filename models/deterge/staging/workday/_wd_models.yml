@@ -1,6 +1,9 @@
 version: 2
 
 models:
+  # ==========================================================================
+  # WORKDAY STUDENT MASTER MODEL
+  # ==========================================================================
   - name: stg_wd__students
     description: |
       Staging model for student data from Workday Student (NEW system of record).
@@ -446,5 +449,540 @@ models:
       
       - name: _dbt_loaded_at
         description: Timestamp when dbt processed this record
+        tests:
+          - not_null
+
+  # ==========================================================================
+  # WORKDAY ACADEMIC PROGRAM MODEL
+  # ==========================================================================
+  - name: stg_wd__acad
+    description: |
+      Staging model for student academic program data from Workday Student.
+      
+      This model provides academic program information including enrollment status,
+      academic standing, GPA, program of study, and related academic records.
+      
+      **IMPORTANT DESIGN NOTE**: Many fields in the source contain semicolon-separated
+      lists (e.g., "Fall 2017; Spring 2020; Summer 2019"). These are preserved as-is
+      in this staging model following the principle of source fidelity. Splitting/
+      unnesting happens in intermediate models (see int_wd__academic_periods_unnested).
+      
+      **Grain**: One row per student academic record
+      **Source**: workday.sta_acad_wd
+      **Materialization**: View
+      **Updates**: Refreshed with each dbt run (currently manual CSV loads)
+      **Owner**: Registrar / Data Engineering
+      
+      **Key Features:**
+      - Converts numeric flags (0/1) to booleans (true/false)
+      - Standardizes nulls (empty strings → NULL)
+      - Preserves semicolon-separated fields for downstream processing
+      - Includes MATCHING_HISTORICAL_STUDENT for linking to Jenzabar CX
+      
+      **Integration Notes:**
+      - Join to stg_wd__students via: student_id = student_id
+      - This is the PRIMARY source for academic standing/GPA for current students
+      - Jenzabar CX data (stg_jcx__students) used as fallback for legacy students
+      - Integration happens in int_students_academic model
+    
+    columns:
+      # =====================================================================
+      # PRIMARY KEYS
+      # =====================================================================
+      - name: student_id
+        description: |
+          Numeric student identifier from Workday.
+          Links to stg_wd__students.student_id for demographic data.
+        tests:
+          - not_null
+      
+      - name: reference_id
+        description: |
+          Character-based student reference ID.
+          Alternative identifier - some systems prefer varchar over numeric.
+      
+      - name: universal_id
+        description: |
+          Universal identifier that may span multiple Workday systems
+          (Student, HR, Finance, etc.).
+      
+      # =====================================================================
+      # ACADEMIC LEVEL & PROGRAM
+      # =====================================================================
+      - name: academic_level
+        description: |
+          Current academic level (Undergraduate, Graduate, Doctoral, etc.).
+          Used for program classification and reporting.
+      
+      - name: primary_academic_plan
+        description: |
+          Student's primary academic plan (major/program).
+          More specific than primary_program_of_study.
+      
+      - name: primary_program_of_study
+        description: |
+          Student's primary program of study.
+          Broader program designation than academic_plan.
+      
+      - name: primary_program_of_study_completion_status
+        description: |
+          Completion status of the primary program
+          (In Progress, Completed, Withdrawn, etc.).
+      
+      - name: primary_program_of_study_record_status
+        description: |
+          Current status of the program record
+          (Active, Inactive, Suspended, etc.).
+      
+      # =====================================================================
+      # DEGREE/CERTIFICATE STATUS
+      # =====================================================================
+      - name: is_degree_seeking
+        description: |
+          Boolean flag indicating if student is seeking a degree or certificate.
+          FALSE = non-degree seeking (audit, continuing education, etc.)
+          TRUE = degree/certificate seeking
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      # =====================================================================
+      # ACADEMIC PERIODS (SINGLE VALUES)
+      # =====================================================================
+      - name: first_academic_period
+        description: |
+          First academic period/term for this student.
+          Example: "Fall 2020"
+      
+      - name: first_standard_academic_period_for_student
+        description: First standard academic period (normalized term code)
+      
+      - name: current_standard_academic_period
+        description: Current standard academic period (term student is currently in)
+      
+      - name: last_academic_period_with_final_grade
+        description: Most recent academic period where final grades were posted
+      
+      - name: current_academic_year
+        description: Current academic year designation (e.g., "2024-2025")
+      
+      # =====================================================================
+      # ACADEMIC PERIODS (SEMICOLON-SEPARATED - PRESERVED AS-IS)
+      # =====================================================================
+      - name: academic_periods_with_academic_period_records
+        description: |
+          **SEMICOLON-SEPARATED LIST** of academic periods where student has records.
+          Example: "Fall 2017; Spring 2020; Summer 2019"
+          
+          This field is preserved as-is in staging. To analyze individual terms,
+          use the int_wd__academic_periods_unnested model which splits this field
+          using LATERAL FLATTEN.
+          
+          Do NOT attempt to parse this field directly in downstream models.
+      
+      - name: academic_calendar_as_of_primary_program_of_study_declare_date
+        description: |
+          Academic calendar reference at time of program declaration.
+          May contain semicolon-separated values.
+      
+      - name: academic_period_records
+        description: |
+          Academic period record IDs (semicolon-separated).
+          These are internal Workday IDs for academic period records.
+      
+      # =====================================================================
+      # ACADEMIC STANDING & PERFORMANCE
+      # =====================================================================
+      - name: latest_academic_standing
+        description: |
+          Most recent academic standing designation.
+          Examples: "Good Standing", "Academic Probation", "Dean's List"
+          
+          **KEY FIELD** for academic intervention and reporting.
+      
+      - name: latest_class_standing
+        description: |
+          Most recent class standing.
+          Examples: "Freshman", "Sophomore", "Junior", "Senior", "Graduate"
+      
+      - name: latest_load_status
+        description: |
+          Most recent enrollment load status.
+          Examples: "Full-time", "Part-time", "Three-Quarter Time", "Less Than Half Time"
+      
+      - name: anticipated_load_status
+        description: Anticipated load status for upcoming term (used for planning)
+      
+      - name: gpa_cumulative_institutional
+        description: |
+          Cumulative institutional GPA (courses taken at this institution only).
+          Numeric value with 3 decimal places (e.g., 3.456).
+          
+          **PRIMARY GPA FIELD** for most reporting purposes.
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0.0
+              max_value: 4.5
+              inclusive: true
+      
+      - name: gpa_cumulative_overall
+        description: |
+          Cumulative overall GPA including transfer credits.
+          May be higher or lower than institutional GPA depending on transfer work.
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0.0
+              max_value: 4.5
+              inclusive: true
+      
+      - name: gpa_transfer
+        description: |
+          GPA calculated from transfer credits only.
+          May be 0 if no transfer credits or if institution doesn't calculate.
+      
+      # =====================================================================
+      # ENROLLMENT STATUS
+      # =====================================================================
+      - name: is_currently_enrolled
+        description: |
+          Boolean flag indicating current enrollment status.
+          TRUE = student is currently enrolled in courses
+          FALSE = not currently enrolled (between terms, withdrawn, graduated)
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: current_housing_status
+        description: Current on-campus housing/residency status
+      
+      - name: enrolled_unit_type
+        description: Type of enrollment unit (credit hours, contact hours, etc.)
+      
+      # =====================================================================
+      # DEMOGRAPHICS (DUPLICATED FROM STUDENT TABLE)
+      # =====================================================================
+      # Note: These fields also exist in stg_wd__students. Generally prefer
+      # the student table for demographics, but these are included here for
+      # completeness and to avoid joins in simple queries.
+      
+      - name: birth_date
+        description: |
+          Student's date of birth.
+          Duplicated from sta_student_wd - prefer stg_wd__students for demographics.
+      
+      - name: gender
+        description: Student's gender (duplicated from student table)
+      
+      - name: citizenship_status
+        description: Citizenship status (duplicated from student table)
+      
+      - name: primary_nationality_citizenship_status
+        description: Primary nationality and citizenship (duplicated from student table)
+      
+      - name: country_of_birth
+        description: Student's country of birth (duplicated from student table)
+      
+      - name: state_of_birth
+        description: Student's state of birth if US-born (duplicated from student table)
+      
+      - name: marital_status
+        description: Student's marital status (duplicated from student table)
+      
+      # =====================================================================
+      # SPECIAL POPULATIONS
+      # =====================================================================
+      - name: is_international_student
+        description: |
+          Boolean flag for international student status.
+          TRUE = requires F-1, J-1, or other visa
+          FALSE = US citizen or permanent resident
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_student_athlete
+        description: |
+          Boolean flag for student-athlete status.
+          TRUE = participates in NCAA/NAIA athletics
+          FALSE = not a student-athlete
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_first_generation
+        description: |
+          Boolean flag for first-generation college student.
+          TRUE = neither parent completed 4-year degree
+          FALSE = at least one parent has 4-year degree
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_military_relationship
+        description: |
+          Boolean flag indicating military affiliation.
+          TRUE = veteran, active duty, dependent, etc.
+          FALSE = no military relationship
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      # =====================================================================
+      # DATES
+      # =====================================================================
+      - name: application_date
+        description: Date when student applied to this program
+      
+      - name: start_date
+        description: |
+          Program start date (first day of enrollment in this program).
+          Used for cohort analysis and retention tracking.
+      
+      - name: expected_completion_date
+        description: |
+          Expected program completion/graduation date.
+          May be updated as student progresses through program.
+      
+      - name: declare_date_for_new_program_of_study_for_new_academic_calendar
+        description: Date when student declared this program of study
+      
+      - name: effective_date_of_student_program_of_study_record_status
+        description: Effective date of the current program status
+      
+      - name: effective_date_for_earliest_inactive_program_of_study_record_status_assignment
+        description: Date when program first became inactive (if applicable)
+      
+      # =====================================================================
+      # ACADEMIC RECORD STATUS
+      # =====================================================================
+      - name: academic_record_status
+        description: |
+          Overall status of the academic record.
+          Examples: "Active", "Inactive", "Graduated", "Withdrawn"
+      
+      - name: is_academic_record_locked
+        description: |
+          Boolean flag indicating if record is locked for editing.
+          TRUE = record is locked (usually after graduation or withdrawal)
+          FALSE = record can be modified
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_pending_grades
+        description: |
+          Boolean flag indicating incomplete grade posting.
+          TRUE = some courses have grades not yet posted
+          FALSE = all expected grades have been posted
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_no_registered_courses
+        description: |
+          Boolean flag indicating no course registrations.
+          TRUE = student has no registered courses for current term
+          FALSE = student has at least one registered course
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      # =====================================================================
+      # INSTITUTION & ACADEMIC UNIT
+      # =====================================================================
+      - name: institution
+        description: Institution identifier (if multi-institution Workday instance)
+      
+      - name: institution_academic_unit
+        description: Institutional academic unit (college, school, division)
+      
+      - name: academicunit
+        description: |
+          Academic unit designation.
+          May be duplicate of institution_academic_unit - Workday data model variation.
+      
+      # =====================================================================
+      # STUDENT TYPE
+      # =====================================================================
+      - name: student_applicant_type
+        description: |
+          Applicant type classification.
+          Examples: "First-Time Freshman", "Transfer", "Returning", "Graduate"
+      
+      - name: student_applicant_type_category
+        description: Broader category of applicant type
+      
+      - name: number_of_non_degree_programs
+        description: Count of non-degree or certificate programs student is enrolled in
+      
+      # =====================================================================
+      # PRIVACY & STATUS FLAGS
+      # =====================================================================
+      - name: has_privacy_block
+        description: |
+          Boolean flag indicating FERPA privacy block.
+          TRUE = directory information cannot be released
+          FALSE = directory information may be released per policy
+          
+          **CRITICAL** for FERPA compliance.
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: is_deceased
+        description: Boolean flag indicating if student is deceased
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      # =====================================================================
+      # HISTORICAL/INTEGRATION FIELD
+      # =====================================================================
+      - name: matching_historical_student
+        description: |
+          **CRITICAL FIELD FOR ENTITY RESOLUTION**
+          
+          Reference to historical/legacy student record from Jenzabar CX.
+          Links this Workday academic record back to corresponding Jenzabar CX student.
+          
+          Used for high-confidence matching in dim_integration_ids.
+          
+          **Integration Note**: This field should match the same field in
+          stg_wd__students, enabling joins across both Workday tables and
+          to Jenzabar CX.
+      
+      # =====================================================================
+      # SEMICOLON-SEPARATED REFERENCE FIELDS
+      # =====================================================================
+      # The following fields contain semicolon-separated lists of IDs or
+      # references. These are preserved as-is in staging. Create specific
+      # unnesting models only if these fields are needed for analysis.
+      
+      - name: academic_record
+        description: Academic record reference IDs (semicolon-separated)
+      
+      - name: academic_requirement_s__for_student
+        description: Academic requirements for student (semicolon-separated)
+      
+      - name: academic_requirement_area_assignments
+        description: Requirement area assignments (semicolon-separated)
+      
+      - name: academic_requirement_overrides
+        description: Requirement overrides (semicolon-separated)
+      
+      - name: academic_requirements
+        description: Academic requirements (semicolon-separated)
+      
+      - name: activated_historical_academic_record
+        description: Activated historical record references (semicolon-separated)
+      
+      - name: active_holdable_assignments
+        description: Active hold assignments (semicolon-separated)
+      
+      - name: all_academic_periods_for_continuing_student_registration_onboarding
+        description: Academic periods for continuing student onboarding (semicolon-separated)
+      
+      - name: all_cumulative_gpa_overrides
+        description: GPA override records (semicolon-separated)
+      
+      - name: awards_and_activities
+        description: |
+          Student awards, honors, and activities (semicolon-separated).
+          Consider creating int_wd__awards_unnested if detailed award analysis needed.
+      
+      - name: citizenship_countries
+        description: Countries of citizenship (semicolon-separated if multiple)
+      
+      - name: current_athletic_teams
+        description: |
+          Current athletic team memberships (semicolon-separated).
+          Example: "Men's Basketball; Baseball"
+      
+      - name: financial_aid_period_records
+        description: Financial aid period record IDs (semicolon-separated)
+      
+      - name: financial__aid_record
+        description: Financial aid record reference
+      
+      - name: historical_academic_record
+        description: Historical academic record references (semicolon-separated)
+      
+      - name: historical_academic_record_activation_date_and_time
+        description: Timestamp when historical record was activated in Workday
+      
+      - name: historical_academic_record_on_transcript_record
+        description: Historical records that appear on transcript (semicolon-separated)
+      
+      - name: historical_match_reconciliations
+        description: Match reconciliation records (semicolon-separated)
+      
+      - name: internal_articulated_registrations
+        description: Internal articulated registration records (semicolon-separated)
+      
+      - name: new_academic_calendar_for_new_program_of_study
+        description: New academic calendar reference for program changes
+      
+      - name: new_program_of_study_for_new_academic_calendar
+        description: New program of study reference for calendar changes
+      
+      - name: program_cip_code_on_academic_record_start_date
+        description: CIP code at time of program start (for IPEDS reporting)
+      
+      - name: programs_of_study
+        description: |
+          All programs of study (semicolon-separated).
+          Example: "BA Psychology; Minor in Statistics"
+          
+          Consider creating int_wd__programs_unnested for detailed program analysis.
+      
+      - name: race_ethnicities
+        description: Race and ethnicity designations (semicolon-separated)
+      
+      - name: sexual_orientations
+        description: Sexual orientation(s) if multiple provided (semicolon-separated)
+      
+      - name: student
+        description: Student reference/ID (Workday internal identifier)
+      
+      - name: student_accomplishments
+        description: Student accomplishments (semicolon-separated)
+      
+      - name: student_applications
+        description: Application record references (semicolon-separated)
+      
+      - name: student_cohort
+        description: Primary student cohort designation
+      
+      - name: student_cohort_assignments
+        description: |
+          All cohort assignments (semicolon-separated).
+          Example: "Class of 2025; Honors Program; First Generation"
+      
+      - name: student_cohorts
+        description: All cohorts student belongs to (semicolon-separated)
+      
+      - name: student_groupings
+        description: Student grouping assignments (semicolon-separated)
+      
+      - name: student_hold_assignments
+        description: |
+          Hold assignments (semicolon-separated).
+          Example: "Financial Hold; Advising Hold"
+          
+          Consider unnesting if holds need to be analyzed individually.
+      
+      - name: student_program_of_study_record
+        description: Program of study record reference (Workday internal ID)
+      
+      - name: visa_id_types
+        description: Visa ID types for international students (semicolon-separated)
+      
+      # =====================================================================
+      # METADATA COLUMNS
+      # =====================================================================
+      - name: _dbt_loaded_at
+        description: |
+          Timestamp when dbt processed this record.
+          Added by dbt, not from source system.
         tests:
           - not_null
