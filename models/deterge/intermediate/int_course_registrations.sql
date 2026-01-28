@@ -7,7 +7,10 @@
 
 /*
 Purpose: Course registrations with registration event history
-Source: CW_REC (via deterge_cx_cw_rec_enriched), REG_REC (via stg_jcx__registrations)
+Source: CW_REC (via deterge_cx_cw_rec_enrich
+
+
+ed), REG_REC (via stg_jcx__registrations)
 Grain: One row per course work record (student course enrollment)
 Key: course_work_number
 */
