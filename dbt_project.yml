@@ -174,7 +174,7 @@ snapshots:
 # =============================================================================
 seeds:
   ditteau_data_v1:
-    +schema: deposit  # Seeds go in deposit schema
+    +schema: distribute  # Seeds go in distribute schema
     +tags: ['seed', 'reference']
     +quote_columns: false
     
@@ -184,6 +184,15 @@ seeds:
         term_start_date: date
         term_end_date: date
         term_code: varchar(10)
+    
+    dim_gender_seed:
+      +column_types:
+        gender_code: varchar(10)
+        gender_name: varchar(100)
+        gender_category: varchar(50)
+        is_active: boolean
+        sort_order: integer 
+
 
 # =============================================================================
 # Test Configurations

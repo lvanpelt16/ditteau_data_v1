@@ -161,7 +161,8 @@ models:
           Derived from HISPANIC_OR_LATINO field (1=true, 0=false).
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: citizenship_status
         description: Student's citizenship status
@@ -238,7 +239,8 @@ models:
           **KEY FIELD** for identifying current students.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_matriculated
         description: |
@@ -246,7 +248,8 @@ models:
           Different from is_active_matriculated - this shows historical matriculation.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_active_worker
         description: |
@@ -254,19 +257,22 @@ models:
           Used to identify student-workers.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_graduated
         description: Boolean flag indicating if student has graduated
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_deceased
         description: Boolean flag indicating if student is deceased
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_first_generation
         description: |
@@ -274,7 +280,8 @@ models:
           Important for student services, retention programs, and reporting.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: has_national_identifier
         description: |
@@ -282,7 +289,8 @@ models:
           Used for financial aid and tax reporting eligibility.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: has_privacy_block
         description: |
@@ -292,7 +300,8 @@ models:
           **CRITICAL** for FERPA compliance - must be checked before releasing data.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       # =====================================================================
       # MILITARY
@@ -303,7 +312,8 @@ models:
           (veteran, active duty, dependent, etc.).
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: parent_on_active_duty
         description: |
@@ -311,7 +321,8 @@ models:
           Used for dependent benefits.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: military_service
         description: Type of military service (if applicable)
@@ -430,7 +441,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['WORKDAY']
+              arguments:
+                values: ['WORKDAY']
       
       - name: _source_table
         description: Source table name (STA_STUDENT_WD)
@@ -544,7 +556,8 @@ models:
           TRUE = degree/certificate seeking
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       # =====================================================================
       # ACADEMIC PERIODS (SINGLE VALUES)
@@ -621,9 +634,10 @@ models:
           **PRIMARY GPA FIELD** for most reporting purposes.
         tests:
           - dbt_utils.accepted_range:
-              min_value: 0.0
-              max_value: 4.5
-              inclusive: true
+              arguments:
+                min_value: 0.0
+                max_value: 4.5
+                inclusive: true
       
       - name: gpa_cumulative_overall
         description: |
@@ -631,9 +645,10 @@ models:
           May be higher or lower than institutional GPA depending on transfer work.
         tests:
           - dbt_utils.accepted_range:
-              min_value: 0.0
-              max_value: 4.5
-              inclusive: true
+              arguments:
+                min_value: 0.0
+                max_value: 4.5
+                inclusive: true
       
       - name: gpa_transfer
         description: |
@@ -650,7 +665,8 @@ models:
           FALSE = not currently enrolled (between terms, withdrawn, graduated)
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: current_housing_status
         description: Current on-campus housing/residency status
@@ -698,7 +714,8 @@ models:
           FALSE = US citizen or permanent resident
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_student_athlete
         description: |
@@ -707,7 +724,8 @@ models:
           FALSE = not a student-athlete
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_first_generation
         description: |
@@ -716,7 +734,8 @@ models:
           FALSE = at least one parent has 4-year degree
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: has_military_relationship
         description: |
@@ -725,7 +744,8 @@ models:
           FALSE = no military relationship
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       # =====================================================================
       # DATES
@@ -767,7 +787,8 @@ models:
           FALSE = record can be modified
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: has_pending_grades
         description: |
@@ -776,7 +797,8 @@ models:
           FALSE = all expected grades have been posted
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: has_no_registered_courses
         description: |
@@ -785,7 +807,8 @@ models:
           FALSE = student has at least one registered course
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       # =====================================================================
       # INSTITUTION & ACADEMIC UNIT
@@ -827,13 +850,15 @@ models:
           **CRITICAL** for FERPA compliance.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_deceased
         description: Boolean flag indicating if student is deceased
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       # =====================================================================
       # HISTORICAL/INTEGRATION FIELD

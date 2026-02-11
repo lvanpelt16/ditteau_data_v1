@@ -1,11 +1,32 @@
-{{ config(
-    materialized = 'table'
-) }}
+{{
+    config(
+        materialized='table',
+        schema='distribute',
+        tags=['dimension']
+    )
+}}
+
 select
-    MAJOR as major_code,  -- Uppercase column names
-    TXT as major_descr,
-    ACTIVE_DATE as source_active_date,
-    INACTIVE_DATE as source_inactive_date,
-    'Y' as is_current,
-    current_timestamp() as creation_timestamp
+    -- Surrogate key (primary key for dimension)
+    {{ dbt_utils.generate_surrogate_key(['major']) }} as major_key,
+    
+    -- Natural key (business identifier)
+    major as major_code,
+    
+    -- Descriptive attributes
+    txt as major_descr,
+    
+    -- Status tracking
+    active_date as source_active_date,
+    inactive_date as source_inactive_date,
+    case 
+        when inactive_date is null then true 
+        else false 
+    end as is_active,
+    
+    -- Metadata
+    true as is_current,  -- For SCD Type 2 if needed later
+    current_timestamp() as creation_timestamp,
+    current_timestamp() as last_modified_timestamp
+    
 from {{ source('jenzabar_cx_archive', 'major_table') }}

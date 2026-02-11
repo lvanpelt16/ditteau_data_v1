@@ -43,9 +43,10 @@ sources:
           data_class: CONFIDENTIAL  # Contains extensive PII
           contains_pii: true
         
-        freshness:
-          warn_after: {count: 7, period: day}   # Manual loads, less frequent
-          error_after: {count: 30, period: day}
+        config:
+          freshness:
+            warn_after: {count: 7, period: day}   # Manual loads, less frequent
+            error_after: {count: 30, period: day}
         
         columns:
           # Primary Key
@@ -202,9 +203,10 @@ sources:
           data_class: CONFIDENTIAL  # Contains PII and academic records
           contains_pii: true
         
-        freshness:
-          warn_after: {count: 7, period: day}   # Manual loads, less frequent
-          error_after: {count: 30, period: day}
+        config:
+          freshness:
+            warn_after: {count: 7, period: day}   # Manual loads, less frequent
+            error_after: {count: 30, period: day}
         
         columns:
           # ===== PRIMARY IDENTIFIERS =====
@@ -510,4 +512,3 @@ sources:
           
           - name: visa_id_types
             description: Visa ID types for international students (semicolon-separated)
-            

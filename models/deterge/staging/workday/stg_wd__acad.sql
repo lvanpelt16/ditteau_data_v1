@@ -194,5 +194,5 @@ select
     -- Metadata (to be added via macro once source is defined)
     current_timestamp() as _dbt_loaded_at
 
-from {{ source('workday_student', 'sta_acad_wd') }}
+from {{ source('workday', 'sta_acad_wd') }}
 where student_id is not null

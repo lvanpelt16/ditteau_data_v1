@@ -1,6 +1,10 @@
-{{ config(
-    materialized = 'table'
-) }}
+{{
+    config(
+        materialized='table',
+        schema='distribute',
+        tags=['dimension']
+    )
+}}
 
 WITH RECURSIVE date_series AS (
     SELECT TO_DATE('1980-01-01') AS dt

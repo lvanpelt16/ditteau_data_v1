@@ -1,16 +1,701 @@
 version: 2
 
 models:
-  
+  # ===========================================================================
+  # DATE DIMENSION
+  # ===========================================================================
   - name: dim_date
-    description: "Date dimension with academic, fiscal, and term associations"
+    description: |
+      Date dimension with calendar, academic, fiscal, and term associations.
+
+      **Grain**: One row per calendar date
+      **Source**: Generated date series (1980-2035) joined to dim_term
+      **Primary Key**: date_key (YYYYMMDD integer)
+      **Materialization**: Table
+
     columns:
       - name: date_key
-        description: "YYYYMMDD surrogate key"
+        description: Surrogate key in YYYYMMDD format (e.g., 20240115 for Jan 15, 2024)
         tests:
           - unique
           - not_null
+
       - name: date_actual
-        description: "Actual calendar date"
+        description: Actual calendar date
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # MAJOR DIMENSION
+  # ===========================================================================
+  - name: dim_major
+    description: |
+      Major dimension containing academic majors and programs of study.
+
+      **Grain**: One row per major
+      **Source**: jenzabar_cx_archive.major_table
+      **Primary Key**: major_key (surrogate key)
+      **Natural Key**: major_code
+      **Materialization**: Table
+
+    columns:
+      - name: major_key
+        description: Surrogate primary key (MD5 hash of major_code)
+        tests:
+          - not_null
+          - unique
+
+      - name: major_code
+        description: Natural key - institutional major code (e.g., 'BIOL', 'PSYC')
+        tests:
+          - not_null
+          - unique
+
+      - name: major_descr
+        description: Full major name/description
+        tests:
+          - not_null
+
+      - name: source_active_date
+        description: Date when the major was activated in the source system
+
+      - name: source_inactive_date
+        description: Date when the major was inactivated (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if major is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # ETHNICITY DIMENSION
+  # ===========================================================================
+  - name: dim_ethnicity
+    description: |
+      Ethnicity dimension containing ethnic background codes and descriptions.
+
+      **Grain**: One row per ethnicity code
+      **Source**: jenzabar_cx_archive.ethnic_table
+      **Primary Key**: ethnicity_key (surrogate key)
+      **Natural Key**: ethnicity_code
+      **Materialization**: Table
+
+    columns:
+      - name: ethnicity_key
+        description: Surrogate primary key (MD5 hash of ethnicity_code)
+        tests:
+          - not_null
+          - unique
+
+      - name: ethnicity_code
+        description: Natural key - institutional ethnicity code
+        tests:
+          - not_null
+          - unique
+
+      - name: ethnicity_descr
+        description: Full ethnicity description
+
+      - name: source_active_date
+        description: Date when the ethnicity code was activated
+
+      - name: source_inactive_date
+        description: Date when the ethnicity code was inactivated (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if ethnicity code is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # DEGREE DIMENSION
+  # ===========================================================================
+  - name: dim_degree
+    description: |
+      Degree dimension containing degree types (BA, BS, MA, etc.).
+
+      **Grain**: One row per degree code
+      **Source**: jenzabar_cx_archive.deg_table
+      **Primary Key**: degree_key (surrogate key)
+      **Natural Key**: degree_code
+      **Materialization**: Table
+
+    columns:
+      - name: degree_key
+        description: Surrogate primary key (MD5 hash of degree_code)
+        tests:
+          - not_null
+          - unique
+
+      - name: degree_code
+        description: Natural key - degree code (e.g., 'BA', 'BS', 'MA')
+        tests:
+          - not_null
+          - unique
+
+      - name: degree_descr
+        description: Full degree description (e.g., 'Bachelor of Arts')
+
+      - name: source_active_date
+        description: Date when the degree code was activated
+
+      - name: source_inactive_date
+        description: Date when the degree code was inactivated (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if degree is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # DEPARTMENT DIMENSION
+  # ===========================================================================
+  - name: dim_dept
+    description: |
+      Department dimension containing academic departments.
+
+      **Grain**: One row per department code
+      **Source**: jenzabar_cx_archive.dept_table
+      **Primary Key**: dept_key (surrogate key)
+      **Natural Key**: dept_code
+      **Materialization**: Table
+
+    columns:
+      - name: dept_key
+        description: Surrogate primary key (MD5 hash of dept_code)
+        tests:
+          - not_null
+          - unique
+
+      - name: dept_code
+        description: Natural key - department code
+        tests:
+          - not_null
+          - unique
+
+      - name: dept_descr
+        description: Full department description
+
+      - name: source_active_date
+        description: Date when the department was activated
+
+      - name: source_inactive_date
+        description: Date when the department was inactivated (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if department is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # GRADE DIMENSION
+  # ===========================================================================
+  - name: dim_grade
+    description: |
+      Grade dimension containing grade codes, descriptions, and point values.
+
+      **Grain**: One row per grade code
+      **Source**: jenzabar_cx_archive.grd_table
+      **Primary Key**: grade_key (surrogate key)
+      **Natural Key**: grade_code
+      **Materialization**: Table
+
+    columns:
+      - name: grade_key
+        description: Surrogate primary key (MD5 hash of grade_code)
+        tests:
+          - not_null
+          - unique
+
+      - name: grade_code
+        description: Natural key - grade code (e.g., 'A', 'B+', 'W')
+        tests:
+          - not_null
+          - unique
+
+      - name: grade_descr
+        description: Full grade description
+
+      - name: grade_category
+        description: Grade category grouping
+
+      - name: grade_pts
+        description: Grade point value for GPA calculation
+
+      - name: source_active_date
+        description: Date when the grade code was activated
+
+      - name: source_inactive_date
+        description: Date when the grade code was inactivated (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if grade is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # TERM DIMENSION
+  # ===========================================================================
+  - name: dim_term
+    description: |
+      Term dimension containing academic terms/sessions.
+
+      **Grain**: One row per term (session + subsession + year + program)
+      **Source**: jenzabar_cx_archive.acad_cal_rec
+      **Primary Key**: term_key (surrogate key)
+      **Natural Key**: term_code (composite)
+      **Materialization**: Table
+
+    columns:
+      - name: term_key
+        description: Surrogate primary key (MD5 hash of term components)
+        tests:
+          - not_null
+          - unique
+
+      - name: term_code
+        description: Natural key - composite term code
+        tests:
+          - not_null
+
+      - name: term_descr
+        description: Full term description
+
+      - name: term_acad_yr
+        description: Academic year (e.g., '2024-2025')
+
+      - name: term_sess
+        description: Session code (e.g., 'FA', 'SP', 'SU')
+
+      - name: term_year
+        description: Calendar year
+
+      - name: term_subsess
+        description: Subsession code
+
+      - name: term_program_level
+        description: Program level (e.g., 'UNDG', 'GRAD')
+
+      - name: term_award_yr
+        description: Award year
+
+      - name: term_fiscal_yr
+        description: Fiscal year
+
+      - name: term_beg_date
+        description: Term begin date
+
+      - name: term_end_date
+        description: Term end date
+
+      - name: source_active_date
+        description: Date when the term was activated
+
+      - name: source_inactive_date
+        description: Date when the term was inactivated
+
+      - name: is_active
+        description: Boolean flag indicating if term is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # FACULTY DIMENSION
+  # ===========================================================================
+  - name: dim_faculty
+    description: |
+      Faculty dimension containing instructor and faculty information.
+
+      **Grain**: One row per faculty member
+      **Source**: stg_jcx__faculty, stg_jcx__id, dim_dept
+      **Primary Key**: faculty_key (surrogate key)
+      **Natural Key**: faculty_code
+      **Materialization**: Table
+
+    columns:
+      - name: faculty_key
+        description: Surrogate primary key (MD5 hash of faculty_id)
+        tests:
+          - not_null
+          - unique
+
+      - name: faculty_code
+        description: Natural key - faculty identifier
+        tests:
+          - not_null
+          - unique
+
+      - name: faculty_lastname
+        description: Faculty last name
+
+      - name: faculty_firstname
+        description: Faculty first name
+
+      - name: faculty_middlename
+        description: Faculty middle name
+
+      - name: faculty_prefix
+        description: Faculty title/prefix (e.g., 'Dr.', 'Prof.')
+
+      - name: faculty_suffix
+        description: Faculty suffix (e.g., 'Jr.', 'PhD')
+
+      - name: faculty_rank
+        description: Faculty rank/title code
+
+      - name: faculty_dept
+        description: Primary department code
+
+      - name: source_active_date
+        description: Faculty status date
+
+      - name: source_inactive_date
+        description: Date when faculty became inactive (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if faculty is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # STUDENT DIMENSION
+  # ===========================================================================
+  - name: dim_student
+    description: |
+      Student dimension containing student demographic and academic information.
+
+      **Grain**: One row per student
+      **Source**: stg_jcx__profile, stg_jcx__id, stg_jcx__students, dim_major, dim_ethnicity
+      **Primary Key**: student_key (surrogate key)
+      **Natural Key**: student_code
+      **Materialization**: Table
+
+    columns:
+      - name: student_key
+        description: Surrogate primary key (MD5 hash of person_id)
+        tests:
+          - not_null
+          - unique
+
+      - name: student_code
+        description: Natural key - student identifier
+        tests:
+          - not_null
+          - unique
+
+      - name: student_lastname
+        description: Student last name
+
+      - name: student_firstname
+        description: Student first name
+
+      - name: student_middlename
+        description: Student middle name
+
+      - name: student_prefix
+        description: Student title/prefix
+
+      - name: student_suffix
+        description: Student suffix
+
+      - name: student_major
+        description: Primary major code
+
+      - name: student_dob
+        description: Student date of birth
+
+      - name: student_ethnicity
+        description: Student ethnicity code
+
+      - name: student_grad_date
+        description: Degree grant/graduation date
+
+      - name: student_acad_stat
+        description: Academic standing status description
+
+      - name: student_program_level
+        description: Program level (e.g., 'UNDG', 'GRAD')
+
+      - name: source_active_date
+        description: Record added date
+
+      - name: source_inactive_date
+        description: Date when student became inactive (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if student is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # COURSE DIMENSION
+  # ===========================================================================
+  - name: dim_course
+    description: |
+      Course dimension containing course catalog information.
+
+      **Grain**: One row per course
+      **Source**: stg_jcx__courses
+      **Primary Key**: course_key (surrogate key)
+      **Natural Key**: course_code
+      **Materialization**: Table
+
+    columns:
+      - name: course_key
+        description: Surrogate primary key (MD5 hash of course_number)
+        tests:
+          - not_null
+          - unique
+
+      - name: course_code
+        description: Natural key - course number
+        tests:
+          - not_null
+          - unique
+
+      - name: course_title
+        description: Full course title
+
+      - name: course_catalog
+        description: Catalog code
+
+      - name: course_program_level
+        description: Program level (e.g., 'UNDG', 'GRAD')
+
+      - name: course_dept
+        description: Department code
+
+      - name: source_active_date
+        description: Course status date
+
+      - name: source_inactive_date
+        description: Date when course became inactive (NULL if active)
+
+      - name: is_active
+        description: Boolean flag indicating if course is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null
+
+  # ===========================================================================
+  # COURSE SECTION DIMENSION
+  # ===========================================================================
+  - name: dim_course_section
+    description: |
+      Course section dimension containing specific section offerings per term.
+
+      **Grain**: One row per course section per term
+      **Source**: stg_jcx__courses, stg_jcx__sections, dim_faculty, dim_dept
+      **Primary Key**: course_section_key (surrogate key)
+      **Natural Key**: course_number + section_number + academic_year + term_code
+      **Materialization**: Table
+
+    columns:
+      - name: course_section_key
+        description: Surrogate primary key (MD5 hash of composite key)
+        tests:
+          - not_null
+          - unique
+
+      - name: course_section_course_number
+        description: Course number
+        tests:
+          - not_null
+
+      - name: course_section_section_number
+        description: Section number
+        tests:
+          - not_null
+
+      - name: course_title
+        description: Course title from catalog
+
+      - name: section_title
+        description: Section-specific title override
+
+      - name: course_section_catalog
+        description: Catalog code
+
+      - name: course_section_dept
+        description: Department code
+
+      - name: course_section_sess
+        description: Term/session code
+
+      - name: course_section_year
+        description: Academic year
+
+      - name: course_section_subsess
+        description: Subsession code
+
+      - name: course_section_program_level
+        description: Program level
+
+      - name: course_section_reg_number
+        description: Current registered student count
+
+      - name: course_section_status
+        description: Section status code
+
+      - name: course_section_faculty_key
+        description: Primary faculty code (FK to dim_faculty)
+
+      - name: source_active_date
+        description: Section begin date
+
+      - name: source_inactive_date
+        description: Section end date
+
+      - name: is_active
+        description: Boolean flag indicating if section is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
         tests:
           - not_null

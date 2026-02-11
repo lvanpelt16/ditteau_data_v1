@@ -32,9 +32,10 @@ sources:
           source_file: id_rec
           data_owner: COMMON
           data_class: PII
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
         columns:
           - name: id
             description: Serial system assigned unique identifier
@@ -64,9 +65,10 @@ sources:
           source_file: profile_rec
           data_owner: COMMON
           data_class: PII
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
         columns:
           - name: id
             description: Person identifier (links to id_rec)
@@ -105,9 +107,10 @@ sources:
             source_file: aa_rec
             data_owner: COMMON
             data_class: PII
-          freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+          congig:
+            freshness:
+              warn_after: {count: 24, period: hour}
+              error_after: {count: 48, period: hour}
         columns:
          - name: aa_no
            description: System-generated unique number for each address record (surrogate key)
@@ -174,9 +177,10 @@ sources:
           source_file: adm_rec
           data_owner: ADMISSIONS
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       # -------------------------------------------------------------------------
       # STUDENT ACADEMIC RECORDS
@@ -192,9 +196,10 @@ sources:
           source_file: prog_enr_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
         columns:
           - name: id
             description: Student identifier (maps to student_id)
@@ -247,9 +252,10 @@ sources:
           source_file: stu_acad_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       - name: stu_stat_rec
         description: "Student statistical summary record from Jenzabar CX data share."
@@ -257,9 +263,10 @@ sources:
           source_file: stu_stat_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       # -------------------------------------------------------------------------
       # COURSE & SECTION RECORDS
@@ -270,9 +277,10 @@ sources:
           source_file: crs_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       - name: sec_rec
         description: "Course section record from Jenzabar CX data share."
@@ -280,9 +288,10 @@ sources:
           source_file: sec_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
 
       - name: secmtg_rec
         description: "Course section and meeting record from Jenzabar CX data share."
@@ -290,9 +299,10 @@ sources:
           source_file: secmtg_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       
       - name: mtg_rec
@@ -308,9 +318,10 @@ sources:
           source_file: reg_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       - name: cw_rec
         description: "Course work/grade records from Jenzabar CX data share."
@@ -318,9 +329,10 @@ sources:
           source_file: cw_rec
           data_owner: REGISTRAR
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       # -------------------------------------------------------------------------
       # FACULTY
@@ -331,9 +343,10 @@ sources:
           source_file: fac_rec
           data_owner: COMMON
           data_class: INTERNAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       # -------------------------------------------------------------------------
       # STUDENT FINANCIAL RECORDS
@@ -344,9 +357,10 @@ sources:
           source_file: sbcust_rec
           data_owner: BURSAR
           data_class: FINANCIAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       - name: stu_serv_rec
         description: "Student service/charge record from Jenzabar CX data share."
@@ -354,9 +368,10 @@ sources:
           source_file: stu_serv_rec
           data_owner: BURSAR
           data_class: FINANCIAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       - name: suba_rec
         description: "Subsidiary account record from Jenzabar CX data share."
@@ -364,9 +379,10 @@ sources:
           source_file: suba_rec
           data_owner: BURSAR
           data_class: FINANCIAL
-        freshness:
-          warn_after: {count: 24, period: hour}
-          error_after: {count: 48, period: hour}
+        config:
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
       
       # -------------------------------------------------------------------------
       # CONTACT RECORDS

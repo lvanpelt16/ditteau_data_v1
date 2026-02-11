@@ -26,9 +26,10 @@ models:
     
     tests:
       - dbt_utils.recency:
-          datepart: day
-          field: updated_date
-          interval: 7
+          arguments:
+            datepart: day
+            field: updated_date
+            interval: 7
     
     columns:
       - name: person_id
@@ -69,7 +70,8 @@ models:
         description: Boolean indicating if this entity is deceased
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: birth_date
         description: Date of birth (copy from profile_rec for query convenience)
@@ -99,9 +101,10 @@ models:
     
     tests:
       - dbt_utils.recency:
-          datepart: day
-          field: last_updated_date
-          interval: 7
+          arguments:
+            datepart: day
+            field: last_updated_date
+            interval: 7
     
     columns:
       - name: person_id
@@ -112,8 +115,9 @@ models:
           - not_null
           - unique
           - relationships:
-              to: source('jenzabar_cx_archive', 'id_rec')
-              field: id
+              arguments:
+                to: source('jenzabar_cx_archive', 'id_rec')
+                field: id
         meta:
           primary_key: true
       
@@ -132,7 +136,8 @@ models:
         description: Boolean indicating if person is Hispanic
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: gender_code
         description: |
@@ -199,7 +204,8 @@ models:
         description: Boolean indicating if person is a resident alien
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: visa_code
         description: American residential status / visa type code
@@ -215,7 +221,8 @@ models:
         description: Boolean indicating if person is a veteran
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: veteran_chapter_code
         description: Veteran's chapter association code
@@ -362,9 +369,10 @@ models:
     
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - student_id
-            - program_code
+          arguments:
+            combination_of_columns:
+              - student_id
+              - program_code
     
     columns:
       # Primary Keys
@@ -375,8 +383,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: source('jenzabar_cx_archive', 'id_rec')
-              field: id
+              arguments:
+                to: source('jenzabar_cx_archive', 'id_rec')
+                field: id
         meta:
           primary_key: true
       
@@ -473,7 +482,8 @@ models:
           Based on cur_stat values: A, C, G, H are considered active.
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
       
       - name: is_degree_seeking
         description: |
@@ -481,6 +491,7 @@ models:
           True if deg_cde is populated.
         tests:
           - accepted_values:
+              arguments:
               values: [true, false]
       
       # Metadata columns (added by add_source_metadata macro)
@@ -491,7 +502,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['JENZABAR_CX']
+              arguments:
+                values: ['JENZABAR_CX']
       
       - name: _source_table
         description: |
@@ -518,7 +530,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']
+              arguments:
+                values: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']
       
       - name: _data_owner
         description: |
