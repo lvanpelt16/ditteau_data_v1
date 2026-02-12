@@ -21,6 +21,8 @@ select
     b.suffix as student_suffix,
     d.major_code as student_major,
     a.birth_date as student_dob,
+    a.gender_code as student_gender,
+    a.residence_country as student_country,
     f.ethnicity_code as student_ethnicity,
     c.degree_grant_date as student_grad_date,
     e.txt as student_acad_stat,

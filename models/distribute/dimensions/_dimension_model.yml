@@ -509,6 +509,12 @@ models:
       - name: student_dob
         description: Student date of birth
 
+      - name: student_gender
+        description: Student gender code
+
+      - name: student_country
+        description: Student residence country code
+
       - name: student_ethnicity
         description: Student ethnicity code
 
