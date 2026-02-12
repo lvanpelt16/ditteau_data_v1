@@ -1,0 +1,6 @@
+gender_code,gender_name,gender_category,is_active,sort_order
+M,Male,Binary,true,1
+F,Female,Binary,true,2
+N,Non-Binary,Non-Binary,true,3
+X,Not Disclosed,Unknown,true,4
+U,Unknown,Unknown,true,5
