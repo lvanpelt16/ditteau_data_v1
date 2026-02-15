@@ -1,18 +1,96 @@
 version: 2
 
 models:
+  # ===========================================================================
+  # ENROLLMENT FACT
+  # ===========================================================================
   - name: fact_enrollment
-    description: "Fact table representing student course enrollments"
+    description: |
+      Fact table representing student course enrollments and grades.
+
+      **Grain**: One row per student-course-section enrollment
+      **Source**: deterge_cx_cw_rec_enriched (Jenzabar course work records)
+      **Primary Key**: enrollment_key (surrogate key)
+      **Materialization**: Table
+
     columns:
-      - name: enrollment_stu_key
-        description: "Foreign key to DIM_STUDENT"
+      - name: enrollment_key
+        description: Surrogate primary key for enrollment record
+        tests:
+          - not_null
+          - unique
+
+      - name: enrollment_student_key
+        description: Foreign key to dim_student
         tests:
           - not_null
           - relationships:
               to: ref('dim_student')
               field: student_key
+
       - name: enrollment_course_section_key
-        description: "Foreign key to DIM_COURSE_SECTION"
+        description: Foreign key to dim_course_section
         tests:
           - not_null
-           
+          - relationships:
+              to: ref('dim_course_section')
+              field: course_section_key
+
+      - name: enrollment_term_key
+        description: Foreign key to dim_term
+
+      - name: enrollment_faculty_key
+        description: Foreign key to dim_faculty (via course section)
+
+      - name: enrollment_grade_key
+        description: Foreign key to dim_grade
+
+      - name: enrollment_first_date_key
+        description: Foreign key to dim_date for first enrollment event
+
+      - name: enrollment_latest_date_key
+        description: Foreign key to dim_date for latest enrollment event
+
+      - name: enrollment_source_serial
+        description: Source system serial number (CW_NO)
+
+      - name: enrollment_program_level
+        description: Program level (e.g., 'UNDG', 'GRAD')
+
+      - name: enrollment_hours
+        description: Credit hours for the enrollment
+
+      - name: enrollment_status
+        description: Current enrollment status code
+
+      - name: enrollment_first_stat
+        description: First registration status
+
+      - name: enrollment_latest_stat
+        description: Latest/final registration status
+
+      - name: source_active_date
+        description: Enrollment begin date
+
+      - name: source_inactive_date
+        description: Enrollment end date
+
+      - name: is_active
+        description: Boolean flag indicating if enrollment is currently active
+        tests:
+          - not_null
+
+      - name: is_current
+        description: SCD Type 2 flag (currently always TRUE)
+        tests:
+          - not_null
+
+      - name: creation_timestamp
+        description: Timestamp when record was created
+        tests:
+          - not_null
+
+      - name: last_modified_timestamp
+        description: Timestamp when record was last modified
+        tests:
+          - not_null

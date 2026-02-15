@@ -467,26 +467,36 @@ models:
   # ===========================================================================
   - name: dim_student
     description: |
-      Student dimension containing student demographic and academic information.
+      Student dimension containing integrated student data from Workday and Jenzabar CX.
+      Uses the "golden record" pattern to merge data from both systems.
 
-      **Grain**: One row per student
-      **Source**: stg_jcx__profile, stg_jcx__id, stg_jcx__students, dim_major, dim_ethnicity
+      **Grain**: One row per student (Ditteau Master ID)
+      **Source**: int_students (integrated from Workday + Jenzabar CX)
       **Primary Key**: student_key (surrogate key)
-      **Natural Key**: student_code
+      **Natural Key**: student_code (ditteau_id)
       **Materialization**: Table
 
     columns:
       - name: student_key
-        description: Surrogate primary key (MD5 hash of person_id)
+        description: Surrogate primary key (MD5 hash of ditteau_id)
         tests:
           - not_null
           - unique
 
       - name: student_code
-        description: Natural key - student identifier
+        description: Natural key - Ditteau master student identifier
         tests:
           - not_null
           - unique
+
+      - name: wd_student_id
+        description: Workday student ID (NULL if not in Workday)
+
+      - name: jcx_student_id
+        description: Jenzabar CX student ID (NULL if not in Jenzabar)
+
+      - name: primary_source_system
+        description: Primary system of record (WORKDAY or JENZABAR_CX)
 
       - name: student_lastname
         description: Student last name
@@ -497,46 +507,112 @@ models:
       - name: student_middlename
         description: Student middle name
 
-      - name: student_prefix
-        description: Student title/prefix
+      - name: student_preferred_name
+        description: Student preferred name (from Workday)
 
-      - name: student_suffix
-        description: Student suffix
-
-      - name: student_major
-        description: Primary major code
+      - name: student_full_name
+        description: Full name (first + last)
 
       - name: student_dob
         description: Student date of birth
 
+      - name: student_age
+        description: Student calculated age
+
       - name: student_gender
         description: Student gender code
 
-      - name: student_country
-        description: Student residence country code
+      - name: student_gender_identity
+        description: Student gender identity (from Workday)
 
       - name: student_ethnicity
-        description: Student ethnicity code
+        description: Student race/ethnicity code
 
-      - name: student_grad_date
-        description: Degree grant/graduation date
+      - name: student_is_hispanic
+        description: Hispanic or Latino indicator
 
-      - name: student_acad_stat
-        description: Academic standing status description
+      - name: student_country
+        description: Student residence country
+
+      - name: student_state
+        description: Student residence state
+
+      - name: student_city
+        description: Student residence city
+
+      - name: student_postal_code
+        description: Student postal/ZIP code
+
+      - name: student_email
+        description: Student email address
+
+      - name: student_major
+        description: Primary program of study
+
+      - name: student_academic_unit
+        description: Academic unit (from Workday)
+
+      - name: student_academic_level
+        description: Primary academic level
 
       - name: student_program_level
-        description: Program level (e.g., 'UNDG', 'GRAD')
+        description: Program level code (from Jenzabar)
 
-      - name: source_active_date
-        description: Record added date
+      - name: student_degree_code
+        description: Degree code (from Jenzabar)
 
-      - name: source_inactive_date
-        description: Date when student became inactive (NULL if active)
+      - name: student_class_level
+        description: Class standing code (from Jenzabar)
+
+      - name: student_planned_grad_year
+        description: Planned graduation year
+
+      - name: student_planned_grad_term
+        description: Planned graduation term
 
       - name: is_active
         description: Boolean flag indicating if student is currently active
         tests:
           - not_null
+
+      - name: is_matriculated
+        description: Boolean flag indicating if student is matriculated
+
+      - name: is_graduated
+        description: Boolean flag indicating if student has graduated
+
+      - name: is_degree_seeking
+        description: Boolean flag indicating if student is degree-seeking
+
+      - name: is_first_generation
+        description: Boolean flag indicating first-generation student
+
+      - name: is_independent_student
+        description: Boolean flag indicating independent student (24+)
+
+      - name: has_privacy_block
+        description: Boolean flag indicating privacy block on record
+
+      - name: is_deceased
+        description: Boolean flag indicating deceased student
+
+      - name: in_both_systems
+        description: Boolean flag - student exists in both Workday and Jenzabar
+
+      - name: workday_only
+        description: Boolean flag - student only in Workday (new student)
+
+      - name: jcx_only
+        description: Boolean flag - student only in Jenzabar (legacy)
+
+      - name: data_quality_flag
+        description: Data quality indicator (COMPLETE, MISSING_NAME, etc.)
+
+      - name: source_active_date
+        description: First entry date
+
+      - name: source_inactive_date
+        description: Date when student became inactive (NULL if active)
 
       - name: is_current
         description: SCD Type 2 flag (currently always TRUE)
